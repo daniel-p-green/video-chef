@@ -32,11 +32,15 @@ The Adobe skill includes all scripting guides published by the docsforadobe orga
 
 - `init_video_project.py` creates a non-destructive production workspace and records.
 - `media_inventory.py` produces recursive `ffprobe` inventories with optional SHA-256 hashes.
+- `asset_inventory.py` catalogs media, graphics, brand files, scripts, templates, projects, captions, and other production assets.
 - `make_contact_sheet.py` creates evenly sampled visual sheets.
+- `scene_detect.py` produces scene-boundary manifests and optional boundary frames.
+- `extract_frame_sequence.py` creates bounded timestamped frame runs for animation and motion analysis.
+- `transcript_workbench.py` runs local Whisper/MLX Whisper or normalizes existing Whisper JSON into readable, word-level, speaker-aware, and production-cue records.
 - `media_qc.py` performs full decode, black/freeze detection, and EBU loudness analysis.
 - `subtitle_qc.py` checks SRT/WebVTT timing, overlap, line length, line count, and reading speed.
 
-The plugin also includes templates for the creative brief, edit plan, selects, rights, audio post, caption QA, delivery specification, decision/change lineage, and master QA.
+The plugin also includes templates for the creative brief, edit plan, selects, rights, speaker mapping, full-runtime screen review, audio post, caption QA, delivery specification, decision/change lineage, and master QA.
 
 ## Production philosophy
 
@@ -53,6 +57,7 @@ The plugin also includes templates for the creative brief, edit plan, selects, r
 - Codex with plugin marketplace support.
 - Python 3.10 or later for included helper scripts.
 - `ffmpeg` and `ffprobe` for media inventory, contact sheets, and automated QC.
+- Local OpenAI Whisper or MLX Whisper is optional for direct transcription; existing Whisper JSON can be processed without either engine. Model selection and downloads are explicit.
 - Adobe applications only when using the Adobe automation skill.
 
 Destination-specific codec, loudness, caption, accessibility, and platform requirements can change. Video Chef records and verifies the intended delivery specification rather than assuming one universal preset.
@@ -63,7 +68,7 @@ Destination-specific codec, loudness, caption, accessibility, and platform requi
 python3 -m unittest discover -s tests -v
 ```
 
-The test suite validates package structure and runs behavioral media, caption, and project-initialization checks when FFmpeg is available.
+The test suite validates package structure and exercises asset discovery, the Whisper CLI contract, transcript timing and cues, scene detection, bounded frame extraction, media QC, captions, and project initialization.
 
 ## License
 

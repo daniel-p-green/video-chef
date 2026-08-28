@@ -1,6 +1,6 @@
 {
   "name": "video-chef",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Professional video development from story lock and media intelligence through editorial, sound, graphics, finishing, Adobe automation, QC, and delivery.",
   "author": {
     "name": "Daniel Green",
@@ -14,7 +14,7 @@
   "interface": {
     "displayName": "Video Chef",
     "shortDescription": "Professional, source-faithful video production.",
-    "longDescription": "A modular video-production system for story development, media inventory, transcription and selects, editorial construction, audio post, accessible captions, motion graphics, color and finishing, Adobe automation, deterministic QC, and verified delivery. It preserves original media, editable project lineage, rights provenance, and human creative approval.",
+    "longDescription": "A modular video-production system for story development, complete asset inventory, local word-timed transcription, scene and frame inspection, evidence-backed selects, editorial construction, audio post, accessible captions, motion graphics, color and finishing, Adobe automation, deterministic QC, and verified delivery. It preserves original media, editable project lineage, rights provenance, and human creative approval.",
     "developerName": "Daniel Green",
     "category": "Creativity",
     "capabilities": [

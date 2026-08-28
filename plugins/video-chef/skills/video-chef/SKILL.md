@@ -57,7 +57,11 @@ Never infer a later state from an earlier one. A contact sheet, transcript, prox
 
 - `../../scripts/init_video_project.py`: safe project structure and production records.
 - `../../scripts/media_inventory.py`: recursive `ffprobe` inventory with optional hashes.
+- `../../scripts/asset_inventory.py`: all-file production inventory with role suggestions and optional hashes.
 - `../../scripts/make_contact_sheet.py`: evenly sampled frame sheet.
+- `../../scripts/scene_detect.py`: scene-boundary manifest and optional boundary frames.
+- `../../scripts/extract_frame_sequence.py`: bounded timestamped frames for close motion inspection.
+- `../../scripts/transcript_workbench.py`: local Whisper or Whisper-JSON transcript, word timing, speaker-map, and production-cue records.
 - `../../scripts/media_qc.py`: full decode, black/freeze detection, and loudness report.
 - `../../scripts/subtitle_qc.py`: SRT/WebVTT timing and readability checks.
 - `../../assets/`: brief, edit plan, selects, rights, audio, captions, decision, delivery, and QA templates.

@@ -18,6 +18,8 @@ TEMPLATES = {
     "EDIT_PLAN.template.md": "03_analysis",
     "SELECTS.template.csv": "03_analysis",
     "RIGHTS_LOG.template.csv": "03_analysis",
+    "SCREEN_REVIEW.template.csv": "03_analysis",
+    "SPEAKER_MAP.template.csv": "03_analysis",
     "AUDIO_POST.template.md": "09_logs",
     "CAPTION_QA.template.md": "09_logs",
     "DELIVERY_SPEC.template.md": "08_delivery",
