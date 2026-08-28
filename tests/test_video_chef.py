@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import json
+import http.client
 import os
 import re
 import shutil
+import socket
 import subprocess
 import tempfile
+import threading
+import time
 import unittest
 from pathlib import Path
 
@@ -22,11 +26,11 @@ class PackageTests(unittest.TestCase):
         self.assertEqual(market["plugins"][0]["name"], "video-chef")
         self.assertEqual(market["plugins"][0]["source"]["path"], "./plugins/video-chef")
         self.assertEqual(manifest["name"], "video-chef")
-        self.assertEqual(manifest["version"], "1.1.0")
+        self.assertEqual(manifest["version"], "1.2.0")
 
     def test_all_skills_have_valid_identity_and_no_placeholders(self):
         skills = sorted((PLUGIN / "skills").glob("*/SKILL.md"))
-        self.assertEqual(len(skills), 8)
+        self.assertEqual(len(skills), 11)
         for path in skills:
             text = path.read_text()
             match = re.search(r"^name:\s*([^\s]+)$", text, re.MULTILINE)
@@ -51,8 +55,150 @@ class PackageTests(unittest.TestCase):
         ):
             self.assertIn(phrase, source_notes)
 
+    def test_premiere_connector_is_localhost_only_and_read_only(self):
+        manifest = json.loads((PLUGIN / "premiere-uxp/video-chef-bridge/manifest.json").read_text())
+        capabilities = json.loads((PLUGIN / "premiere-uxp/video-chef-bridge/capabilities.json").read_text())
+        self.assertEqual(manifest["host"]["app"], "premierepro")
+        self.assertEqual(manifest["host"]["minVersion"], "25.6.0")
+        self.assertEqual(manifest["requiredPermissions"]["network"]["domains"], ["http://127.0.0.1:17841"])
+        self.assertFalse(capabilities["mutationEnabled"])
+        self.assertEqual(set(capabilities["capabilities"]), {"ping", "snapshot_active_sequence"})
+        runtime = (PLUGIN / "premiere-uxp/video-chef-bridge/main.js").read_text()
+        self.assertNotIn("eval(", runtime)
+        self.assertNotIn("Function(", runtime)
+        self.assertNotIn("executeTransaction", runtime)
+
 
 class ToolTests(unittest.TestCase):
+    def test_premiere_sequence_snapshot_and_guarded_rough_cut(self):
+        with tempfile.TemporaryDirectory() as raw:
+            temp = Path(raw)
+            report = temp / "sequence.md"
+            subprocess.run([
+                "python3", str(SCRIPTS / "premiere_sequence_analysis.py"),
+                str(ROOT / "tests/fixtures/premiere-snapshot.json"), str(report),
+            ], check=True)
+            text = report.read_text()
+            self.assertIn("Launch Film v03", text)
+            self.assertIn("0.000-5.000", text)
+            self.assertIn("interpretation boundary", text)
+
+            plan = temp / "plan.json"
+            subprocess.run([
+                "python3", str(SCRIPTS / "premiere_rough_cut.py"),
+                str(ROOT / "tests/fixtures/rough-cut-selects.csv"), str(plan),
+                "--target-sequence", "VC_ROUGH_CUT_20260827_v01", "--fps", "29.97",
+            ], check=True)
+            data = json.loads(plan.read_text())
+            self.assertEqual(data["mode"], "plan_only")
+            self.assertFalse(data["execution"]["requested"])
+            self.assertFalse(data["execution"]["supported_by_bundled_connector"])
+            self.assertEqual(data["segments"][1]["timeline_in_seconds"], 5.0)
+            self.assertEqual(len(data["plan_sha256"]), 64)
+
+            data["segments"][0]["source_out_seconds"] = 99
+            tampered = temp / "tampered.json"
+            tampered.write_text(json.dumps(data))
+            tamper_check = subprocess.run([
+                "python3", str(SCRIPTS / "premiere_rough_cut.py"), str(tampered),
+                str(temp / "tampered-output.json"), "--target-sequence", "IGNORED", "--validate-only",
+            ], capture_output=True, text=True)
+            self.assertEqual(tamper_check.returncode, 1)
+            self.assertIn("plan_sha256", tamper_check.stderr)
+
+            blocked = subprocess.run([
+                "python3", str(SCRIPTS / "premiere_rough_cut.py"),
+                str(ROOT / "tests/fixtures/rough-cut-selects.csv"), str(temp / "blocked.json"),
+                "--target-sequence", "MASTER", "--fps", "29.97",
+            ], capture_output=True, text=True)
+            self.assertEqual(blocked.returncode, 1)
+            self.assertIn("VC_ROUGH_CUT_", blocked.stderr)
+
+    def test_premiere_broker_authenticated_round_trip_and_mutation_guard(self):
+        with tempfile.TemporaryDirectory() as raw:
+            temp = Path(raw)
+            config = temp / "bridge.json"
+            with socket.socket() as sock:
+                sock.bind(("127.0.0.1", 0))
+                port = sock.getsockname()[1]
+            subprocess.run([
+                "python3", str(SCRIPTS / "premiere_bridge.py"), "--config", str(config),
+                "init", "--port", str(port),
+            ], check=True, capture_output=True, text=True)
+            self.assertEqual(config.stat().st_mode & 0o077, 0)
+            details = json.loads(config.read_text())
+            headers = {"Authorization": f"Bearer {details['token']}", "Content-Type": "application/json"}
+
+            def local_request(method, path, body=None, authorized=True, timeout=1):
+                connection = http.client.HTTPConnection("127.0.0.1", port, timeout=timeout)
+                request_headers = dict(headers) if authorized else {"Authorization": "Bearer wrong"}
+                encoded = json.dumps(body).encode() if body is not None else None
+                try:
+                    connection.request(method, path, body=encoded, headers=request_headers)
+                    response = connection.getresponse()
+                    raw_body = response.read()
+                    parsed = json.loads(raw_body) if raw_body else None
+                    return response.status, parsed
+                finally:
+                    connection.close()
+            server = subprocess.Popen([
+                "python3", str(SCRIPTS / "premiere_bridge.py"), "--config", str(config),
+                "serve", "--request-timeout", "3",
+            ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            try:
+                for _ in range(50):
+                    try:
+                        status, _ = local_request("GET", "/v1/status", timeout=0.2)
+                        self.assertEqual(status, 200)
+                        break
+                    except OSError:
+                        time.sleep(0.05)
+                else:
+                    self.fail("broker did not start")
+
+                status, _ = local_request("POST", "/v1/connector/register", {
+                    "protocol_version": "1.0", "connector_version": "test",
+                    "premiere_version": "test", "capabilities": ["ping"],
+                })
+                self.assertEqual(status, 200)
+                status, _ = local_request("OPTIONS", "/v1/connector/register", authorized=False)
+                self.assertEqual(status, 204)
+
+                def fake_connector():
+                    for _ in range(60):
+                        status, job = local_request("GET", "/v1/connector/next", timeout=0.5)
+                        if status == 200:
+                            result_status, _ = local_request("POST", "/v1/connector/result", {
+                                "id": job["id"], "result": {"ok": True, "data": {"message": "pong"}},
+                            })
+                            if result_status != 200:
+                                raise AssertionError(f"connector result returned {result_status}")
+                            return
+                        if status != 204:
+                            raise AssertionError(f"connector poll returned {status}")
+                        time.sleep(0.05)
+
+                worker = threading.Thread(target=fake_connector, daemon=True)
+                worker.start()
+                completed = subprocess.run([
+                    "python3", str(SCRIPTS / "premiere_bridge.py"), "--config", str(config),
+                    "request", "ping", "--timeout", "4",
+                ], check=True, capture_output=True, text=True)
+                worker.join(timeout=2)
+                self.assertEqual(json.loads(completed.stdout)["result"]["data"]["message"], "pong")
+
+                status, _ = local_request("POST", "/v1/request", {"operation": "apply_rough_cut", "payload": {}})
+                self.assertEqual(status, 403)
+                status, _ = local_request("GET", "/v1/status", authorized=False)
+                self.assertEqual(status, 401)
+            finally:
+                server.terminate()
+                server.wait(timeout=5)
+                if server.stdout:
+                    server.stdout.close()
+                if server.stderr:
+                    server.stderr.close()
+
     def test_subtitle_qc_distinguishes_good_and_bad(self):
         with tempfile.TemporaryDirectory() as raw:
             temp = Path(raw)

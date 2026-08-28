@@ -25,6 +25,9 @@ Start a new Codex task after installation so the skills are loaded.
 | `video-motion-graphics` | Designs and proves titles and motion systems inside the real edit |
 | `video-finishing-delivery` | Conforms, restores, color-manages, exports, QCs, and verifies delivery |
 | `adobe-video-automation` | Routes safe Premiere, After Effects, Media Encoder, Animate, and Illustrator automation |
+| `premiere-bridge` | Sets up and diagnoses a localhost-only, token-authenticated UXP connection to the active Premiere session |
+| `premiere-sequence-analysis` | Turns an exact active-sequence snapshot into an evidence-backed structural and narrative review |
+| `premiere-rough-cut` | Builds a source-linked, digest-identified rough-cut plan for a new isolated Premiere sequence |
 
 The Adobe skill includes all scripting guides published by the docsforadobe organization and prioritizes Adobe's official Premiere UXP documentation for current Premiere development.
 
@@ -39,6 +42,11 @@ The Adobe skill includes all scripting guides published by the docsforadobe orga
 - `transcript_workbench.py` runs local Whisper/MLX Whisper or normalizes existing Whisper JSON into readable, word-level, speaker-aware, and production-cue records.
 - `media_qc.py` performs full decode, black/freeze detection, and EBU loudness analysis.
 - `subtitle_qc.py` checks SRT/WebVTT timing, overlap, line length, line count, and reading speed.
+- `premiere_bridge.py` initializes, diagnoses, serves, and queries the private read-only Premiere bridge.
+- `premiere_sequence_analysis.py` validates live sequence snapshots and writes timestamped evidence reports.
+- `premiere_rough_cut.py` validates transcript selects and creates a deterministic plan-only assembly record.
+
+The plugin bundles an original Premiere UXP panel under `premiere-uxp/video-chef-bridge`. Connector 1.0 is intentionally read-only: it can prove connectivity and inspect the active project and sequence, but it cannot alter a timeline. Rough-cut execution remains gated until a write-capable connector can prove project identity, plan identity, isolated sequence creation, undoability, post-edit reinspection, and failure-safe restoration inside Premiere.
 
 The plugin also includes templates for the creative brief, edit plan, selects, rights, speaker mapping, full-runtime screen review, audio post, caption QA, delivery specification, decision/change lineage, and master QA.
 
@@ -59,6 +67,7 @@ The plugin also includes templates for the creative brief, edit plan, selects, r
 - `ffmpeg` and `ffprobe` for media inventory, contact sheets, and automated QC.
 - Local OpenAI Whisper or MLX Whisper is optional for direct transcription; existing Whisper JSON can be processed without either engine. Model selection and downloads are explicit.
 - Adobe applications only when using the Adobe automation skill.
+- Premiere Pro 25.6 or later and Adobe UXP Developer Tool 2.2 or later when using the live Premiere bridge. The default connector network permission is restricted to `127.0.0.1:17841`. A successful in-Premiere ping remains the required live transport proof, especially on macOS where Adobe documents restrictions on plain HTTP.
 
 Destination-specific codec, loudness, caption, accessibility, and platform requirements can change. Video Chef records and verifies the intended delivery specification rather than assuming one universal preset.
 
@@ -68,7 +77,7 @@ Destination-specific codec, loudness, caption, accessibility, and platform requi
 python3 -m unittest discover -s tests -v
 ```
 
-The test suite validates package structure and exercises asset discovery, the Whisper CLI contract, transcript timing and cues, scene detection, bounded frame extraction, media QC, captions, and project initialization.
+The test suite validates package and UXP structure, broker authentication and capability guards, synthetic connector round trips, active-sequence evidence, guarded rough-cut plans, asset discovery, the Whisper CLI contract, transcript timing and cues, scene detection, bounded frame extraction, media QC, captions, and project initialization.
 
 ## License
 

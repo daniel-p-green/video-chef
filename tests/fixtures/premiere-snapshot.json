@@ -1,0 +1,71 @@
+{
+  "schema_version": "1.0",
+  "captured_at": "2026-08-27T20:00:00Z",
+  "connector": {
+    "version": "1.0.0",
+    "mutation_enabled": false
+  },
+  "project": {
+    "name": "Launch Film",
+    "path": "/private/project/launch.prproj",
+    "guid": "project-guid"
+  },
+  "sequence": {
+    "name": "Launch Film v03",
+    "guid": "sequence-guid",
+    "duration_seconds": 8.0,
+    "frame_width": 1920,
+    "frame_height": 1080,
+    "timebase_ticks_per_frame": "8475667200"
+  },
+  "tracks": [
+    {
+      "media_type": "video",
+      "index": 0,
+      "id": 1,
+      "name": "V1",
+      "muted": false,
+      "items": [
+        {
+          "name": "Interview A",
+          "timeline_start_seconds": 0.0,
+          "timeline_end_seconds": 5.0,
+          "source_in_seconds": 12.0,
+          "source_out_seconds": 17.0,
+          "disabled": false,
+          "project_item_name": "interview-a.mov",
+          "media_path": "/private/media/interview-a.mov"
+        },
+        {
+          "name": "Product B-roll",
+          "timeline_start_seconds": 5.0,
+          "timeline_end_seconds": 8.0,
+          "source_in_seconds": 20.0,
+          "source_out_seconds": 23.0,
+          "disabled": false,
+          "project_item_name": "product.mov",
+          "media_path": "/private/media/product.mov"
+        }
+      ]
+    },
+    {
+      "media_type": "audio",
+      "index": 0,
+      "id": 2,
+      "name": "A1",
+      "muted": false,
+      "items": [
+        {
+          "name": "Interview A",
+          "timeline_start_seconds": 0.0,
+          "timeline_end_seconds": 5.0,
+          "source_in_seconds": 12.0,
+          "source_out_seconds": 17.0,
+          "disabled": false,
+          "project_item_name": "interview-a.mov",
+          "media_path": "/private/media/interview-a.mov"
+        }
+      ]
+    }
+  ]
+}

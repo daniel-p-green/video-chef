@@ -1,0 +1,4 @@
+interface:
+  display_name: "Premiere Sequence Analysis"
+  short_description: "Analyze the active sequence from exact timeline evidence."
+  default_prompt: "Analyze the active Premiere sequence for narrative and structure."

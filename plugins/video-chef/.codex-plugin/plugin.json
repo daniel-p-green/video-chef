@@ -1,7 +1,7 @@
 {
   "name": "video-chef",
-  "version": "1.1.0",
-  "description": "Professional video development from story lock and media intelligence through editorial, sound, graphics, finishing, Adobe automation, QC, and delivery.",
+  "version": "1.2.0",
+  "description": "Professional video development with live, safety-gated Premiere sequence intelligence from story lock through editorial, sound, graphics, finishing, QC, and delivery.",
   "author": {
     "name": "Daniel Green",
     "url": "https://github.com/daniel-p-green"
@@ -14,7 +14,7 @@
   "interface": {
     "displayName": "Video Chef",
     "shortDescription": "Professional, source-faithful video production.",
-    "longDescription": "A modular video-production system for story development, complete asset inventory, local word-timed transcription, scene and frame inspection, evidence-backed selects, editorial construction, audio post, accessible captions, motion graphics, color and finishing, Adobe automation, deterministic QC, and verified delivery. It preserves original media, editable project lineage, rights provenance, and human creative approval.",
+    "longDescription": "A modular video-production system for story development, complete asset inventory, local word-timed transcription, scene and frame inspection, evidence-backed selects, live read-only Premiere sequence intelligence, guarded transcript-to-rough-cut planning, editorial construction, audio post, accessible captions, motion graphics, color and finishing, Adobe automation, deterministic QC, and verified delivery. It preserves original media, editable project lineage, rights provenance, and human creative approval.",
     "developerName": "Daniel Green",
     "category": "Creativity",
     "capabilities": [
@@ -22,12 +22,14 @@
       "Edit",
       "Audio",
       "Captions",
+      "Premiere bridge",
       "Adobe automation",
       "Local files"
     ],
     "defaultPrompt": [
       "Plan a professional video from story through delivery.",
       "Analyze this footage and build evidence-backed selects.",
+      "Set up the Premiere bridge and analyze the active sequence.",
       "QC this cut for picture, sound, captions, and delivery."
     ],
     "brandColor": "#1664D9",

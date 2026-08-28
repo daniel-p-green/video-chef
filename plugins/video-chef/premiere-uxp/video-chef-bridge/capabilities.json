@@ -1,0 +1,9 @@
+{
+  "protocolVersion": "1.0",
+  "connectorVersion": "1.0.0",
+  "mutationEnabled": false,
+  "capabilities": [
+    "ping",
+    "snapshot_active_sequence"
+  ]
+}

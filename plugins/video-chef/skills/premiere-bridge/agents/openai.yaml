@@ -1,0 +1,4 @@
+interface:
+  display_name: "Premiere Bridge"
+  short_description: "Set up, diagnose, and inspect live Premiere safely."
+  default_prompt: "Set up the Video Chef Premiere Bridge and run doctor."

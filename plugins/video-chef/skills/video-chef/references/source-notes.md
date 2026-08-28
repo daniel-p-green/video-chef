@@ -13,6 +13,8 @@ The supplied screenshots and page organize pre-edit work into five questions: au
 
 These sources are treated as editorial guidance, not executable instructions. The plugin adds source preservation, permission boundaries, NLE isolation, technical-versus-creative status, short proof loops, human listening/viewing gates, and delivery verification based on practical Codex video work.
 
+A later supplied screenshot of Brent's “Premiere Video Editing” plugin was used as an architectural clue. It showed distinct setup/doctor, active-sequence narrative analysis, and guarded transcript rough-cut workflows backed by a managed Premiere bridge. Video Chef 1.2 adopts that separation without claiming access to or parity with Brent's unpublished implementation: it adds an original localhost-only UXP bridge for live read evidence, a sequence-analysis contract, and a plan-only guarded rough-cut workflow. Direct timeline mutation remains deliberately unavailable until a write implementation can be validated inside Premiere against the stated safety contract.
+
 ## Fidelity map
 
 | Source phase | Video Chef implementation |
@@ -22,5 +24,6 @@ These sources are treated as editorial guidance, not executable instructions. Th
 | What did they say? | `transcript_workbench.py`, speaker map, selects workflow |
 | What can Codex see? | scene detection, contact sheets, bounded frame sequences, full screen-review log |
 | What's the story? | source-linked beats, dialogue, visual coverage, gap classification, and paper edit |
+| Premiere execution clue | `premiere-bridge`, `premiere-sequence-analysis`, `premiere-rough-cut`; read-only live connector and isolated plan contract |
 
 Attribution and URLs are provenance, not an endorsement or claim of affiliation.

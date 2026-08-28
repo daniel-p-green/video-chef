@@ -16,6 +16,9 @@ Coordinate the production; route each stage to the matching sibling skill. Build
 - Titles, lower thirds, motion language, screen graphics, visual systems, or phone-scale proofing: use `video-motion-graphics`.
 - Conform, color, restoration, master/export specifications, automated QC, review, or delivery: use `video-finishing-delivery`.
 - Premiere Pro, After Effects, Media Encoder, Animate, or Illustrator scripting: use `adobe-video-automation`.
+- Premiere bridge setup, diagnostics, connectivity, or an exact live active-sequence snapshot: use `premiere-bridge`.
+- Evidence-backed structural or narrative analysis of the active Premiere sequence: use `premiere-sequence-analysis`.
+- Transcript/selects-driven Premiere rough-cut planning with isolated target-sequence safeguards: use `premiere-rough-cut`.
 
 For a narrow mechanical task such as trim, transcode, resize, extract audio, or generate a proxy, inspect the input and perform only that operation; do not impose the full workflow.
 
@@ -64,6 +67,9 @@ Never infer a later state from an earlier one. A contact sheet, transcript, prox
 - `../../scripts/transcript_workbench.py`: local Whisper or Whisper-JSON transcript, word timing, speaker-map, and production-cue records.
 - `../../scripts/media_qc.py`: full decode, black/freeze detection, and loudness report.
 - `../../scripts/subtitle_qc.py`: SRT/WebVTT timing and readability checks.
+- `../../scripts/premiere_bridge.py`: localhost-only, token-authenticated broker, setup, doctor, and allowlisted read requests for the bundled Premiere UXP connector.
+- `../../scripts/premiere_sequence_analysis.py`: validates an active-sequence snapshot and produces a timestamped structural evidence report.
+- `../../scripts/premiere_rough_cut.py`: builds a deterministic, source-linked, plan-only rough-cut record for a new isolated sequence.
 - `../../assets/`: brief, edit plan, selects, rights, audio, captions, decision, delivery, and QA templates.
 
 The source roadmap is summarized in [source-notes.md](references/source-notes.md). The older detailed references remain valid fallbacks when a specialist skill is unavailable.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Premiere Rough Cut"
+  short_description: "Build a guarded transcript-driven rough-cut plan."
+  default_prompt: "Create a guarded Premiere rough-cut plan from this transcript and selects."

@@ -1,0 +1,54 @@
+{
+  "id": "com.danielgreen.videochef.bridge",
+  "name": "Video Chef Premiere Bridge",
+  "shortname": "VideoChef",
+  "version": "1.0.0",
+  "main": "index.html",
+  "host": {
+    "app": "premierepro",
+    "minVersion": "25.6.0"
+  },
+  "manifestVersion": 5,
+  "requiredPermissions": {
+    "network": {
+      "domains": [
+        "http://127.0.0.1:17841"
+      ]
+    }
+  },
+  "entrypoints": [
+    {
+      "id": "videoChefBridge",
+      "type": "panel",
+      "minimumSize": {
+        "width": 280,
+        "height": 260
+      },
+      "maximumSize": {
+        "width": 1200,
+        "height": 1200
+      },
+      "preferredDockedSize": {
+        "width": 340,
+        "height": 420
+      },
+      "preferredFloatingSize": {
+        "width": 380,
+        "height": 460
+      },
+      "label": {
+        "default": "Video Chef Bridge"
+      }
+    }
+  ],
+  "icons": [
+    {
+      "width": 48,
+      "height": 48,
+      "path": "icon.svg",
+      "scale": [1, 2],
+      "theme": ["darkest", "dark", "medium", "lightest", "light", "all"],
+      "species": ["pluginList"]
+    }
+  ]
+}

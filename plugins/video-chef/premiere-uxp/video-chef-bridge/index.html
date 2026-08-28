@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Video Chef Bridge</title>
+    <style>
+      body { background:#171717; color:#f7f7f7; font:13px system-ui,sans-serif; margin:0; padding:16px; }
+      h1 { font-size:18px; margin:0 0 6px; }
+      p { color:#c7c7c7; line-height:1.45; }
+      label { display:block; font-weight:600; margin:14px 0 6px; }
+      input { box-sizing:border-box; width:100%; background:#252525; color:#fff; border:1px solid #555; border-radius:5px; padding:8px; }
+      button { background:#1664d9; color:#fff; border:0; border-radius:5px; font-weight:650; margin-top:12px; padding:8px 12px; }
+      button.secondary { background:#3a3a3a; margin-left:6px; }
+      .state { border-left:3px solid #777; background:#222; margin-top:16px; padding:10px; white-space:pre-wrap; }
+      .state.ok { border-color:#41b883; }
+      .state.error { border-color:#ff4e36; }
+      .guard { color:#ffca55; font-size:12px; }
+    </style>
+  </head>
+  <body>
+    <h1>Video Chef Bridge</h1>
+    <p>Connects this Premiere session to the localhost-only Video Chef broker.</p>
+    <p class="guard">Read-only connector: it can inspect the active sequence but cannot change a timeline.</p>
+    <label for="token">Private bridge token</label>
+    <input id="token" type="password" autocomplete="off" placeholder="Paste from premiere-bridge.json">
+    <button id="connect">Connect</button>
+    <button id="disconnect" class="secondary">Disconnect</button>
+    <div id="state" class="state">Disconnected</div>
+    <script src="main.js"></script>
+  </body>
+</html>
