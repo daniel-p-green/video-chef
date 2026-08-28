@@ -20,6 +20,12 @@ DEFAULT_CUES = (
 )
 
 
+def run_process(command: list[str]) -> subprocess.CompletedProcess[str]:
+    # Executable comes from shutil.which and argv is passed without a shell.
+    # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
+    return subprocess.run(command, capture_output=True, text=True, shell=False)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path, help="Whisper JSON or local audio/video file")
@@ -55,7 +61,7 @@ def run_engine(source: Path, engine: str, model: str | None, language: str | Non
             ]
         if language:
             command += ["--language", language]
-        completed = subprocess.run(command, capture_output=True, text=True)
+        completed = run_process(command)
         if completed.returncode:
             raise RuntimeError(completed.stderr.strip() or completed.stdout.strip() or f"{engine} failed")
         candidates = list(Path(temp).glob("*.json"))
@@ -67,18 +73,39 @@ def run_engine(source: Path, engine: str, model: str | None, language: str | Non
 def read_speaker_map(path: Path | None) -> list[dict]:
     if path is None:
         return []
-    with path.open(newline="", encoding="utf-8-sig") as handle:
-        rows = list(csv.DictReader(handle))
     required = {"start", "end", "speaker"}
-    if not rows or not required.issubset(rows[0]):
-        raise ValueError("speaker map must contain start,end,speaker columns")
-    return [{"start": float(row["start"]), "end": float(row["end"]), "speaker": row["speaker"].strip()} for row in rows]
+    try:
+        with path.open(newline="", encoding="utf-8-sig") as handle:
+            reader = csv.DictReader(handle)
+            if not required.issubset(reader.fieldnames or []):
+                raise ValueError("speaker map must contain start,end,speaker columns")
+            rows = []
+            for index, row in enumerate(reader, start=2):
+                if any(row.get(column) is None or not row[column].strip() for column in required):
+                    raise ValueError(f"speaker map row {index} has a missing start, end, or speaker")
+                start = float(row["start"])
+                end = float(row["end"])
+                if end < start:
+                    raise ValueError(f"speaker map row {index} ends before it starts")
+                rows.append({"start": start, "end": end, "speaker": row["speaker"].strip()})
+    except (csv.Error, KeyError, AttributeError) as exc:
+        raise ValueError(f"invalid speaker map: {exc}") from exc
+    if not rows:
+        raise ValueError("speaker map contains no ranges")
+    return rows
 
 
 def speaker_at(start: float, end: float, mapping: list[dict], fallback: str | None = None) -> str:
-    midpoint = (start + end) / 2
-    matches = [row for row in mapping if row["start"] <= midpoint <= row["end"]]
-    return matches[0]["speaker"] if matches else (fallback or "UNASSIGNED")
+    matches = {
+        row["speaker"]
+        for row in mapping
+        if min(end, row["end"]) > max(start, row["start"])
+    }
+    if not matches and start == end:
+        matches = {row["speaker"] for row in mapping if row["start"] <= start <= row["end"]}
+    if len(matches) > 1:
+        return "MIXED"
+    return next(iter(matches)) if matches else (fallback or "UNASSIGNED")
 
 
 def normalize(raw: dict, speaker_map: list[dict], source: Path) -> tuple[list[dict], list[dict]]:

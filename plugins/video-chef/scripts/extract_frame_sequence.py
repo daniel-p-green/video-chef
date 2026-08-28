@@ -12,6 +12,12 @@ import sys
 from pathlib import Path
 
 
+def run_process(command: list[str]) -> subprocess.CompletedProcess[str]:
+    # FFmpeg receives validated argv elements directly; no shell parses paths or numeric options.
+    # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
+    return subprocess.run(command, capture_output=True, text=True, shell=False)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("input", type=Path)
@@ -49,7 +55,7 @@ def main() -> int:
         "-i", str(source), "-t", str(span), "-vf", f"fps={args.fps},scale={args.width}:-2",
         "-q:v", "2", str(pattern),
     ]
-    completed = subprocess.run(command, capture_output=True, text=True)
+    completed = run_process(command)
     if completed.returncode:
         print(completed.stderr.strip() or "error: frame extraction failed", file=sys.stderr)
         return completed.returncode

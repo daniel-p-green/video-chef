@@ -16,6 +16,12 @@ from pathlib import Path
 PTS_RE = re.compile(r"pts_time:([0-9]+(?:\.[0-9]+)?)")
 
 
+def run_process(command: list[str], *, check: bool = False) -> subprocess.CompletedProcess[str]:
+    # FFmpeg/FFprobe receive validated argv elements directly; no shell parses user input.
+    # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
+    return subprocess.run(command, capture_output=True, text=True, check=check, shell=False)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("input", type=Path)
@@ -28,7 +34,7 @@ def parse_args() -> argparse.Namespace:
 
 def duration(path: Path) -> float:
     command = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "json", str(path)]
-    completed = subprocess.run(command, capture_output=True, text=True, check=True)
+    completed = run_process(command, check=True)
     return float(json.loads(completed.stdout)["format"]["duration"])
 
 
@@ -49,7 +55,7 @@ def main() -> int:
         "ffmpeg", "-hide_banner", "-loglevel", "info", "-i", str(source),
         "-filter:v", f"select='gt(scene,{args.threshold})',showinfo", "-an", "-f", "null", "-",
     ]
-    completed = subprocess.run(command, capture_output=True, text=True)
+    completed = run_process(command)
     if completed.returncode:
         print(completed.stderr.strip() or "error: scene detection failed", file=sys.stderr)
         return 1
@@ -57,7 +63,11 @@ def main() -> int:
     if len(boundaries) > args.max_scenes:
         print(f"error: detected {len(boundaries)} boundaries, exceeding --max-scenes {args.max_scenes}", file=sys.stderr)
         return 1
-    total = duration(source)
+    try:
+        total = duration(source)
+    except (subprocess.CalledProcessError, KeyError, ValueError, json.JSONDecodeError) as exc:
+        print(f"error: could not determine video duration: {exc}", file=sys.stderr)
+        return 1
     rows = [
         {
             "scene": index + 1, "start": start,
@@ -84,7 +94,7 @@ def main() -> int:
                 "ffmpeg", "-hide_banner", "-loglevel", "error", "-ss", str(row["start"]),
                 "-i", str(source), "-frames:v", "1", "-q:v", "2", str(frame),
             ]
-            result = subprocess.run(extract, capture_output=True, text=True)
+            result = run_process(extract)
             if result.returncode:
                 print(result.stderr.strip() or f"error: could not extract {frame.name}", file=sys.stderr)
                 return 1

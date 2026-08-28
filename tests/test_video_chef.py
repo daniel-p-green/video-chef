@@ -175,6 +175,41 @@ class ToolTests(unittest.TestCase):
             ], check=True, env=environment)
             self.assertEqual(json.loads((output / "summary.json").read_text())["engine"], "whisper")
 
+    def test_transcript_workbench_marks_cross_speaker_segment_mixed(self):
+        with tempfile.TemporaryDirectory() as raw:
+            temp = Path(raw)
+            transcript = temp / "crossing.json"
+            data = json.loads((ROOT / "tests/fixtures/whisper.json").read_text())
+            data["segments"] = [{
+                "start": 0.0, "end": 2.4, "text": data["text"],
+                "words": data["segments"][0]["words"] + data["segments"][1]["words"],
+            }]
+            transcript.write_text(json.dumps(data))
+            output = temp / "output"
+            subprocess.run([
+                "python3", str(SCRIPTS / "transcript_workbench.py"), str(transcript), str(output),
+                "--speaker-map", str(ROOT / "tests/fixtures/speaker-map.csv"),
+            ], check=True)
+            segments = (output / "segments.csv").read_text()
+            words = (output / "words.csv").read_text()
+            self.assertIn("MIXED", segments)
+            self.assertIn("PRODUCER", words)
+            self.assertIn("DIRECTOR", words)
+
+    def test_transcript_workbench_rejects_malformed_speaker_map_cleanly(self):
+        with tempfile.TemporaryDirectory() as raw:
+            temp = Path(raw)
+            malformed = temp / "malformed.csv"
+            malformed.write_text("start,end,speaker\n0,1,PRODUCER\n1.1\n")
+            completed = subprocess.run([
+                "python3", str(SCRIPTS / "transcript_workbench.py"),
+                str(ROOT / "tests/fixtures/whisper.json"), str(temp / "output"),
+                "--speaker-map", str(malformed),
+            ], capture_output=True, text=True)
+            self.assertEqual(completed.returncode, 1)
+            self.assertIn("error:", completed.stderr)
+            self.assertNotIn("Traceback", completed.stderr)
+
     @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "FFmpeg is unavailable")
     def test_scene_detection_and_bounded_frame_sequence(self):
         with tempfile.TemporaryDirectory() as raw:
