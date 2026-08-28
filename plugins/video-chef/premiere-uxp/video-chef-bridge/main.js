@@ -1,20 +1,25 @@
-/* Video Chef Premiere Bridge 1.2 — original read-only UXP connector. */
+/* Video Chef Premiere Bridge 1.2.2 — original read-only UXP connector. */
 const ppro = require("premierepro");
 const uxp = require("uxp");
 
 const ENDPOINT = "https://localhost:17841";
 const PROTOCOL_VERSION = "1.0";
-const CONNECTOR_VERSION = "1.2.1";
+const CONNECTOR_VERSION = "1.2.2";
 const CAPABILITIES = ["ping", "snapshot_active_sequence"];
 const TOKEN_STORAGE_KEY = "video-chef-premiere-bridge-token-v1";
 const POLL_INTERVAL_MS = 700;
 const REQUEST_TIMEOUT_MS = 5000;
+const RECONNECT_INITIAL_MS = 1000;
+const RECONNECT_MAX_MS = 10000;
 const INSTANCE_ID = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
 
 let token = "";
 let timer = null;
+let reconnectTimer = null;
+let reconnectDelayMs = RECONNECT_INITIAL_MS;
 let busy = false;
 let connected = false;
+let autoReconnect = false;
 
 const state = document.getElementById("state");
 const tokenInput = document.getElementById("token");
@@ -196,20 +201,34 @@ async function poll() {
     if (timer) clearInterval(timer);
     timer = null;
     setControls();
-    setState(`Connection lost\n${error}\nPress Connect to retry.`, "error");
+    setState(`Connection lost\n${error}\nRetrying automatically.`, "error");
+    scheduleReconnect();
   } finally {
     busy = false;
   }
 }
 
-async function connect() {
-  token = tokenInput.value.trim();
+function scheduleReconnect() {
+  if (!autoReconnect || reconnectTimer || !token) return;
+  const delay = reconnectDelayMs;
+  reconnectTimer = setTimeout(async () => {
+    reconnectTimer = null;
+    await registerConnector(true);
+    if (!connected && autoReconnect) {
+      reconnectDelayMs = Math.min(reconnectDelayMs * 2, RECONNECT_MAX_MS);
+      scheduleReconnect();
+    }
+  }, delay);
+}
+
+async function registerConnector(retrying = false) {
+  if (!retrying) token = tokenInput.value.trim();
   if (token.length < 32) {
     setState("Paste the private bridge token first.", "error");
     return;
   }
   connectButton.disabled = true;
-  setState("Connecting…");
+  setState(retrying ? "Reconnecting…" : "Connecting…");
   try {
     await bridge("/v1/connector/register", {
       method: "POST",
@@ -223,6 +242,10 @@ async function connect() {
     });
     if (rememberInput.checked) await uxp.storage.secureStorage.setItem(TOKEN_STORAGE_KEY, token);
     connected = true;
+    autoReconnect = true;
+    reconnectDelayMs = RECONNECT_INITIAL_MS;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    reconnectTimer = null;
     if (timer) clearInterval(timer);
     timer = setInterval(poll, POLL_INTERVAL_MS);
     setControls();
@@ -239,9 +262,19 @@ async function connect() {
   }
 }
 
+async function connect() {
+  autoReconnect = false;
+  if (reconnectTimer) clearTimeout(reconnectTimer);
+  reconnectTimer = null;
+  await registerConnector(false);
+}
+
 async function disconnect() {
+  autoReconnect = false;
   if (timer) clearInterval(timer);
   timer = null;
+  if (reconnectTimer) clearTimeout(reconnectTimer);
+  reconnectTimer = null;
   if (connected && token) {
     try {
       await bridge("/v1/connector/unregister", {
@@ -270,7 +303,10 @@ async function restoreToken() {
     if (saved.length >= 32) {
       tokenInput.value = saved;
       rememberInput.checked = true;
-      await connect();
+      token = saved;
+      autoReconnect = true;
+      await registerConnector(true);
+      if (!connected) scheduleReconnect();
     }
   } catch (_) { /* secure storage is a cache; manual paste remains available */ }
 }
@@ -280,6 +316,7 @@ disconnectButton.addEventListener("click", disconnect);
 forgetButton.addEventListener("click", forgetToken);
 window.addEventListener("unload", () => {
   if (timer) clearInterval(timer);
+  if (reconnectTimer) clearTimeout(reconnectTimer);
 });
 
 setControls();

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.3 — 2026-08-27
+
+- Added bounded automatic reconnect after a running Premiere broker is restarted or starts after the panel, while preserving explicit disconnect and token-forget behavior.
+- Added a UXP regression test that simulates broker loss, retry, re-registration, and successful recovery without manual token entry.
+
 ## 1.2.2 — 2026-08-27
 
 - Replaced the macOS-incompatible plain-HTTP Premiere loopback transport with TLS 1.2+ on `https://127.0.0.1:17841`.

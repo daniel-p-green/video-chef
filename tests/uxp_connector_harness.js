@@ -62,6 +62,7 @@ const jobs = [
   {id: "job-ping", operation: "ping", payload: {}, protocol_version: "1.0"},
   {id: "job-snapshot", operation: "snapshot_active_sequence", payload: {}, protocol_version: "1.0"}
 ];
+let brokerAvailable = true;
 const response = (status, body) => ({
   status,
   ok: status >= 200 && status < 300,
@@ -69,6 +70,9 @@ const response = (status, body) => ({
 });
 
 const intervals = [];
+const reconnectTimeouts = [];
+const nativeSetTimeout = setTimeout;
+const nativeClearTimeout = clearTimeout;
 const context = {
   AbortController,
   console,
@@ -79,12 +83,23 @@ const context = {
   String,
   document: {getElementById: id => elements[id]},
   window: {addEventListener: () => {}},
-  setTimeout,
-  clearTimeout,
+  setTimeout: (callback, delay) => {
+    if (delay < 5000) {
+      const handle = {callback, cancelled: false};
+      reconnectTimeouts.push(handle);
+      return handle;
+    }
+    return nativeSetTimeout(callback, delay);
+  },
+  clearTimeout: handle => {
+    if (handle && typeof handle === "object" && "cancelled" in handle) handle.cancelled = true;
+    else nativeClearTimeout(handle);
+  },
   setInterval: callback => { intervals.push(callback); return intervals.length; },
   clearInterval: () => {},
   fetch: async (url, options = {}) => {
     requests.push({url, options});
+    if (!brokerAvailable) throw new Error("fixture broker offline");
     if (url.endsWith("/v1/connector/register")) return response(200, {ok: true, mutation_enabled: false});
     if (url.endsWith("/v1/connector/next")) return jobs.length ? response(200, jobs.shift()) : response(204, null);
     if (url.endsWith("/v1/connector/result")) {
@@ -133,9 +148,18 @@ async function main() {
   if (snapshot.tracks[0].items[0].media_path !== "/fixture/source.mp4") throw new Error("media evidence missing");
   const register = requests.find(entry => entry.url.endsWith("/v1/connector/register"));
   const registration = JSON.parse(register.options.body);
-  if (!registration.instance_id || registration.connector_version !== "1.2.1") throw new Error("registration identity missing");
+  if (!registration.instance_id || registration.connector_version !== "1.2.2") throw new Error("registration identity missing");
   if (!register.options.headers["X-Video-Chef-Connector-ID"]) throw new Error("connector header missing");
   if (!register.url.startsWith("https://localhost:17841/")) throw new Error("connector did not use loopback HTTPS");
+  brokerAvailable = false;
+  await intervals[0]();
+  if (reconnectTimeouts.length !== 1 || reconnectTimeouts[0].cancelled) throw new Error("reconnect was not scheduled");
+  if (elements.disconnect.disabled !== true) throw new Error("lost connection controls are incorrect");
+  brokerAvailable = true;
+  await reconnectTimeouts[0].callback();
+  const registrations = requests.filter(entry => entry.url.endsWith("/v1/connector/register"));
+  if (registrations.length !== 2) throw new Error("connector did not re-register after broker recovery");
+  if (elements.connect.disabled !== true || elements.disconnect.disabled !== false) throw new Error("reconnected controls are incorrect");
   await elements.disconnect.listeners.click();
   if (elements.disconnect.disabled !== true) throw new Error("disconnect controls are incorrect");
   process.stdout.write("UXP connector harness passed\n");

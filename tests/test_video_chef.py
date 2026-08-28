@@ -27,7 +27,7 @@ class PackageTests(unittest.TestCase):
         self.assertEqual(market["plugins"][0]["name"], "video-chef")
         self.assertEqual(market["plugins"][0]["source"]["path"], "./plugins/video-chef")
         self.assertEqual(manifest["name"], "video-chef")
-        self.assertEqual(manifest["version"].split("+", 1)[0], "1.2.2")
+        self.assertEqual(manifest["version"].split("+", 1)[0], "1.2.3")
 
     def test_all_skills_have_valid_identity_and_no_placeholders(self):
         skills = sorted((PLUGIN / "skills").glob("*/SKILL.md"))
@@ -61,7 +61,7 @@ class PackageTests(unittest.TestCase):
         capabilities = json.loads((PLUGIN / "premiere-uxp/video-chef-bridge/capabilities.json").read_text())
         self.assertEqual(manifest["host"]["app"], "premierepro")
         self.assertEqual(manifest["host"]["minVersion"], "25.6.0")
-        self.assertEqual(manifest["version"], "1.2.1")
+        self.assertEqual(manifest["version"], "1.2.2")
         self.assertEqual(manifest["requiredPermissions"]["network"]["domains"], ["https://localhost"])
         self.assertFalse(capabilities["mutationEnabled"])
         self.assertEqual(set(capabilities["capabilities"]), {"ping", "snapshot_active_sequence"})

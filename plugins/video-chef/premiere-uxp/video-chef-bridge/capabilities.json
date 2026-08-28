@@ -1,6 +1,6 @@
 {
   "protocolVersion": "1.0",
-  "connectorVersion": "1.2.1",
+  "connectorVersion": "1.2.2",
   "mutationEnabled": false,
   "capabilities": [
     "ping",

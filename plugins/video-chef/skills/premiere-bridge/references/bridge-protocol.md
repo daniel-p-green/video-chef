@@ -4,7 +4,7 @@
 
 The Python broker binds only to `127.0.0.1:17841` with TLS 1.2+. The Premiere UXP panel reaches it through the manifest-compatible `https://localhost:17841` origin. Codex sends certificate-verified requests directly to the loopback address; the connector executes an allowlisted Premiere DOM read and posts the result. All endpoints require the same private bearer token.
 
-The broker uses protocol `1.0`; connector `1.2.1` adds macOS-compatible loopback HTTPS and correctly resolves clip media paths through Premiere's `ClipProjectItem` API without changing the wire protocol. It retains connector 1.1 liveness and secure local token caching. The connector advertises `ping` and `snapshot_active_sequence`, plus `mutation_enabled: false`. The broker rejects undeclared capabilities, arbitrary operations, and any write request.
+The broker uses protocol `1.0`; connector `1.2.2` adds bounded automatic re-registration after broker restarts and when a saved-token panel starts before the broker. It retains connector 1.2.1's macOS-compatible loopback HTTPS and correct clip media-path resolution through Premiere's `ClipProjectItem` API without changing the wire protocol. The connector advertises `ping` and `snapshot_active_sequence`, plus `mutation_enabled: false`. The broker rejects undeclared capabilities, arbitrary operations, and any write request.
 
 ## Endpoints
 
@@ -26,4 +26,4 @@ The broker uses protocol `1.0`; connector `1.2.1` adds macOS-compatible loopback
 
 ## Mutation policy
 
-No write capability exists in connector 1.2.1. A future write connector must use a separate capability version, an isolated new target sequence, a reviewed plan digest, explicit user authorization, an undoable Premiere transaction, post-mutation reinspection, and failure-safe source in/out restoration. A prompt or token alone is not sufficient proof that an edit is safe.
+No write capability exists in connector 1.2.2. A future write connector must use a separate capability version, an isolated new target sequence, a reviewed plan digest, explicit user authorization, an undoable Premiere transaction, post-mutation reinspection, and failure-safe source in/out restoration. A prompt or token alone is not sufficient proof that an edit is safe.

@@ -26,7 +26,7 @@ Connect Codex to the active Premiere session through a private local broker and 
 
 Run `python3 ../../scripts/premiere_bridge.py status` when diagnosing a connection. Exit `0` means the authenticated connector heartbeat is live; exit `2` means the broker answered but no live connector is polling. After the first successful connection, the panel can cache the token in UXP secure storage. **Forget token** removes that cache.
 
-Adobe's current UXP network guide says Premiere on macOS disallows plain HTTP. Connector 1.2 therefore uses certificate-verified loopback HTTPS and an exact manifest allowlist; do not weaken it to broad network access or disable certificate verification. A passing doctor still does not prove Premiere accepted the transport, so the live ping is required. A registered connector with a stale heartbeat is treated as disconnected rather than timing every request out.
+Adobe's current UXP network guide says Premiere on macOS disallows plain HTTP. Connector 1.2 therefore uses certificate-verified loopback HTTPS and an exact manifest allowlist; do not weaken it to broad network access or disable certificate verification. A passing doctor still does not prove Premiere accepted the transport, so the live ping is required. A registered connector with a stale heartbeat is treated as disconnected rather than timing every request out. After a broker restart, connector 1.2.2 retries registration with bounded backoff; an explicit **Disconnect** or **Forget token** cancels automatic recovery.
 
 Loading or launching a UXP plugin changes local Adobe development state. Do it only when the user asked to set up or use the bridge; doctor alone is read-only.
 
