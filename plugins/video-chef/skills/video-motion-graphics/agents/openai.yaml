@@ -1,0 +1,4 @@
+interface:
+  display_name: "Video Motion Graphics"
+  short_description: "Design and prove graphics inside the actual edit."
+  default_prompt: "Create a professional motion-graphics proof for this cut."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Video Finishing & Delivery"
+  short_description: "Conform, finish, QC, and verify delivery masters."
+  default_prompt: "Finish and professionally QC this video master."

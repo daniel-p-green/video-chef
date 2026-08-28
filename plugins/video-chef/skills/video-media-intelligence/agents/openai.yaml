@@ -1,0 +1,4 @@
+interface:
+  display_name: "Video Media Intelligence"
+  short_description: "Inventory footage, transcripts, selects, and coverage gaps."
+  default_prompt: "Analyze this media and build source-linked selects."

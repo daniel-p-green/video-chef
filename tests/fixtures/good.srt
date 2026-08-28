@@ -1,0 +1,7 @@
+1
+00:00:00,500 --> 00:00:02,500
+Welcome to Video Chef.
+
+2
+00:00:02,700 --> 00:00:05,000
+Story first. Then we edit.

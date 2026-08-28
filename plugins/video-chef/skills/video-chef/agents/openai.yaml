@@ -1,0 +1,4 @@
+interface:
+  display_name: "Video Chef"
+  short_description: "Coordinate professional video production end to end."
+  default_prompt: "Help me take this video from story through verified delivery."

@@ -1,0 +1,20 @@
+{
+  "name": "video-chef",
+  "interface": {
+    "displayName": "Video Chef"
+  },
+  "plugins": [
+    {
+      "name": "video-chef",
+      "source": {
+        "source": "local",
+        "path": "./plugins/video-chef"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Creativity"
+    }
+  ]
+}

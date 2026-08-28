@@ -1,0 +1,4 @@
+interface:
+  display_name: "Video Story"
+  short_description: "Lock the audience, story, format, runtime, and tone."
+  default_prompt: "Help me lock this video's story before editing."

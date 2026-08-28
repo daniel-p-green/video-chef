@@ -1,0 +1,37 @@
+{
+  "name": "video-chef",
+  "version": "1.0.0",
+  "description": "Professional video development from story lock and media intelligence through editorial, sound, graphics, finishing, Adobe automation, QC, and delivery.",
+  "author": {
+    "name": "Daniel Green",
+    "url": "https://github.com/daniel-p-green"
+  },
+  "homepage": "https://github.com/daniel-p-green/video-chef",
+  "repository": "https://github.com/daniel-p-green/video-chef",
+  "license": "MIT",
+  "keywords": ["video", "editing", "premiere-pro", "after-effects", "ffmpeg", "captions", "quality-control"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Video Chef",
+    "shortDescription": "Professional, source-faithful video production.",
+    "longDescription": "A modular video-production system for story development, media inventory, transcription and selects, editorial construction, audio post, accessible captions, motion graphics, color and finishing, Adobe automation, deterministic QC, and verified delivery. It preserves original media, editable project lineage, rights provenance, and human creative approval.",
+    "developerName": "Daniel Green",
+    "category": "Creativity",
+    "capabilities": [
+      "Analyze",
+      "Edit",
+      "Audio",
+      "Captions",
+      "Adobe automation",
+      "Local files"
+    ],
+    "defaultPrompt": [
+      "Plan a professional video from story through delivery.",
+      "Analyze this footage and build evidence-backed selects.",
+      "QC this cut for picture, sound, captions, and delivery."
+    ],
+    "brandColor": "#1664D9",
+    "composerIcon": "./assets/composer-icon.png",
+    "logo": "./assets/icon.png"
+  }
+}

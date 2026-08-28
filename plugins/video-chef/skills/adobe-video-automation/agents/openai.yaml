@@ -1,0 +1,4 @@
+interface:
+  display_name: "Adobe Video Automation"
+  short_description: "Automate Premiere, After Effects, and Media Encoder safely."
+  default_prompt: "Help me automate this Adobe video workflow safely."

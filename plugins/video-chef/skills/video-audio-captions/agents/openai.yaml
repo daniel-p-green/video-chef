@@ -1,0 +1,4 @@
+interface:
+  display_name: "Video Audio & Captions"
+  short_description: "Finish dialogue, mix, captions, and accessibility."
+  default_prompt: "Finish and verify this video's audio and captions."

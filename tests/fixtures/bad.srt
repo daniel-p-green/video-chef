@@ -1,0 +1,7 @@
+1
+00:00:00,000 --> 00:00:00,200
+This caption is much too long to read in such a tiny amount of time.
+
+2
+00:00:00,150 --> 00:00:01,000
+Overlapping cue.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Video Editorial"
+  short_description: "Build traceable paper edits and editable timelines."
+  default_prompt: "Turn these selects into a professional editable cut."
