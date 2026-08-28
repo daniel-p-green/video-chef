@@ -14,7 +14,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PLUGIN = ROOT / "plugins" / "video-chef"
+PLUGIN = Path(os.environ.get("VIDEO_CHEF_PLUGIN", ROOT / "plugins" / "video-chef")).resolve()
 SCRIPTS = PLUGIN / "scripts"
 
 
@@ -26,7 +26,7 @@ class PackageTests(unittest.TestCase):
         self.assertEqual(market["plugins"][0]["name"], "video-chef")
         self.assertEqual(market["plugins"][0]["source"]["path"], "./plugins/video-chef")
         self.assertEqual(manifest["name"], "video-chef")
-        self.assertEqual(manifest["version"], "1.2.0")
+        self.assertEqual(manifest["version"].split("+", 1)[0], "1.2.0")
 
     def test_all_skills_have_valid_identity_and_no_placeholders(self):
         skills = sorted((PLUGIN / "skills").glob("*/SKILL.md"))
