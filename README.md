@@ -42,11 +42,11 @@ The Adobe skill includes all scripting guides published by the docsforadobe orga
 - `transcript_workbench.py` runs local Whisper/MLX Whisper or normalizes existing Whisper JSON into readable, word-level, speaker-aware, and production-cue records.
 - `media_qc.py` performs full decode, black/freeze detection, and EBU loudness analysis.
 - `subtitle_qc.py` checks SRT/WebVTT timing, overlap, line length, line count, and reading speed.
-- `premiere_bridge.py` initializes, diagnoses, serves, and queries the private read-only Premiere bridge.
+- `premiere_bridge.py` initializes, diagnoses, serves, reports live connector heartbeat status, and queries the private read-only Premiere bridge.
 - `premiere_sequence_analysis.py` validates live sequence snapshots and writes timestamped evidence reports.
 - `premiere_rough_cut.py` validates transcript selects and creates a deterministic plan-only assembly record.
 
-The plugin bundles an original Premiere UXP panel under `premiere-uxp/video-chef-bridge`. Connector 1.0 is intentionally read-only: it can prove connectivity and inspect the active project and sequence, but it cannot alter a timeline. Rough-cut execution remains gated until a write-capable connector can prove project identity, plan identity, isolated sequence creation, undoability, post-edit reinspection, and failure-safe restoration inside Premiere.
+The plugin bundles an original Premiere UXP panel under `premiere-uxp/video-chef-bridge`. Connector 1.1 is intentionally read-only: it can prove live connectivity, securely cache the private token in Adobe UXP storage, and inspect the active project and sequence, but it cannot alter a timeline. Rough-cut execution remains gated until a write-capable connector can prove project identity, plan identity, isolated sequence creation, undoability, post-edit reinspection, and failure-safe restoration inside Premiere.
 
 The plugin also includes templates for the creative brief, edit plan, selects, rights, speaker mapping, full-runtime screen review, audio post, caption QA, delivery specification, decision/change lineage, and master QA.
 

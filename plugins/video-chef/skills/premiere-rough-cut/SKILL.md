@@ -23,7 +23,7 @@ python3 ../../scripts/premiere_rough_cut.py SELECTS.csv ROUGH_CUT_PLAN.json \
   --target-sequence VC_ROUGH_CUT_YYYYMMDD_v01 --fps 29.97
 ```
 
-The tool validates positive, unique story order; positive source ranges; deterministic timeline placement; target isolation; and a SHA-256 plan identity. It writes `mode: plan_only`, `execution.requested: false`, and records that connector 1.0 cannot apply the plan.
+The tool validates positive, unique story order; positive source ranges; deterministic timeline placement; target isolation; and a SHA-256 plan identity. It writes `mode: plan_only`, `execution.requested: false`, and records that connector 1.1 cannot apply the plan.
 
 Review the plan against the brief and transcript. Check opening, beat order, runtime, necessary context, repetition, final takeaway, and source fidelity. Resolve ambiguous source paths or overlapping transcript selections before treating it as executable.
 

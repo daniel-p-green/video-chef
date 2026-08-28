@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.1 — 2026-08-27
+
+- Hardened the Premiere connector with heartbeat-based liveness, clean instance unregister, authenticated status reporting, request timeouts, and private-network preflight support.
+- Added Adobe UXP secure-storage token caching with explicit disconnect and forget controls.
+- Expanded live ping evidence with Premiere, connector, active-project, and active-sequence identity.
+- Added partial-snapshot issue reporting and caption-track counts while retaining schema 1.0 analysis compatibility.
+- Made Adobe developer mode an explicit doctor prerequisite instead of allowing package checks to imply live readiness.
+
 ## 1.2.0 — 2026-08-27
 
 - Added an original localhost-only, token-authenticated Premiere broker and bundled UXP panel with explicit capability negotiation.

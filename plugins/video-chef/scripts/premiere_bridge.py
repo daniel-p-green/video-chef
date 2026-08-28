@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import http.client
 import json
+import os
 import plistlib
 import queue
 import secrets
@@ -27,9 +28,10 @@ from pathlib import Path
 from typing import Any
 
 PROTOCOL_VERSION = "1.0"
-CONNECTOR_VERSION = "1.0.0"
+CONNECTOR_VERSION = "1.1.0"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 17841
+CONNECTOR_STALE_AFTER = 5.0
 READ_OPERATIONS = {"ping", "snapshot_active_sequence"}
 
 
@@ -93,6 +95,45 @@ class Broker:
         self.lock = threading.Lock()
         self.connector: dict[str, Any] | None = None
 
+    def register(self, details: dict[str, Any]) -> None:
+        now = time.time()
+        with self.lock:
+            self.connector = {
+                **details,
+                "registered_at": now,
+                "last_seen_at": now,
+            }
+
+    def touch_connector(self, instance_id: str | None = None) -> bool:
+        with self.lock:
+            if not self.connector:
+                return False
+            registered_id = self.connector.get("instance_id")
+            if instance_id and registered_id != instance_id:
+                return False
+            self.connector["last_seen_at"] = time.time()
+            return True
+
+    def unregister(self, instance_id: str | None) -> bool:
+        with self.lock:
+            if not self.connector:
+                return False
+            registered_id = self.connector.get("instance_id")
+            if instance_id and registered_id and instance_id != registered_id:
+                return False
+            self.connector = None
+            return True
+
+    def connector_status(self) -> dict[str, Any] | None:
+        with self.lock:
+            connector = dict(self.connector) if self.connector else None
+        if not connector:
+            return None
+        age = max(0.0, time.time() - float(connector.get("last_seen_at", 0.0)))
+        connector["last_seen_seconds_ago"] = round(age, 3)
+        connector["connected"] = age <= CONNECTOR_STALE_AFTER
+        return connector
+
     def enqueue(self, operation: str, payload: dict[str, Any]) -> Job:
         job = Job(operation=operation, payload=payload)
         with self.lock:
@@ -137,8 +178,9 @@ def make_handler(broker: Broker, request_timeout: float):
             self.send_header("Content-Type", "application/json")
             self.send_header("Cache-Control", "no-store")
             self.send_header("Access-Control-Allow-Origin", "*")
-            self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
+            self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Video-Chef-Connector-ID")
             self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Private-Network", "true")
             self.send_header("Content-Length", str(len(encoded)))
             self.end_headers()
             if encoded:
@@ -164,14 +206,20 @@ def make_handler(broker: Broker, request_timeout: float):
                 self._send(HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
                 return
             if self.path == "/v1/status":
+                connector = broker.connector_status()
                 self._send(HTTPStatus.OK, {
                     "protocol_version": PROTOCOL_VERSION,
-                    "connector": broker.connector,
+                    "connector": connector,
+                    "connected": bool(connector and connector["connected"]),
                     "read_operations": sorted(READ_OPERATIONS),
                     "mutation_enabled": False,
                 })
                 return
             if self.path == "/v1/connector/next":
+                instance_id = self.headers.get("X-Video-Chef-Connector-ID")
+                if not instance_id or not broker.touch_connector(instance_id):
+                    self._send(HTTPStatus.CONFLICT, {"error": "connector instance is not current"})
+                    return
                 job = broker.next_job()
                 if job is None:
                     self._send(HTTPStatus.NO_CONTENT)
@@ -203,16 +251,33 @@ def make_handler(broker: Broker, request_timeout: float):
                 if not isinstance(capabilities, list) or not set(capabilities).issubset(READ_OPERATIONS):
                     self._send(HTTPStatus.BAD_REQUEST, {"error": "invalid capabilities"})
                     return
-                broker.connector = {
+                instance_id = body.get("instance_id")
+                if not isinstance(instance_id, str) or not 8 <= len(instance_id) <= 128:
+                    self._send(HTTPStatus.BAD_REQUEST, {"error": "valid connector instance_id is required"})
+                    return
+                broker.register({
+                    "instance_id": instance_id,
                     "connector_version": str(body.get("connector_version", "unknown")),
                     "premiere_version": str(body.get("premiere_version", "unknown")),
                     "capabilities": capabilities,
-                    "registered_at": time.time(),
-                }
+                })
                 self._send(HTTPStatus.OK, {"ok": True, "mutation_enabled": False})
                 return
 
+            if self.path == "/v1/connector/unregister":
+                instance_id = body.get("instance_id")
+                if not isinstance(instance_id, str):
+                    self._send(HTTPStatus.BAD_REQUEST, {"error": "connector instance_id is required"})
+                    return
+                removed = broker.unregister(instance_id)
+                self._send(HTTPStatus.OK, {"ok": True, "removed": removed})
+                return
+
             if self.path == "/v1/connector/result":
+                instance_id = self.headers.get("X-Video-Chef-Connector-ID")
+                if not instance_id or not broker.touch_connector(instance_id):
+                    self._send(HTTPStatus.CONFLICT, {"error": "connector instance is not current"})
+                    return
                 job_id = body.get("id")
                 result = body.get("result")
                 if not isinstance(job_id, str) or not isinstance(result, dict):
@@ -236,10 +301,14 @@ def make_handler(broker: Broker, request_timeout: float):
                 if not isinstance(payload, dict):
                     self._send(HTTPStatus.BAD_REQUEST, {"error": "payload must be an object"})
                     return
-                if not broker.connector:
+                connector = broker.connector_status()
+                if not connector:
                     self._send(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "Premiere connector is not registered"})
                     return
-                if operation not in broker.connector.get("capabilities", []):
+                if not connector["connected"]:
+                    self._send(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "Premiere connector heartbeat is stale"})
+                    return
+                if operation not in connector.get("capabilities", []):
                     self._send(HTTPStatus.NOT_IMPLEMENTED, {"error": "connector lacks requested capability"})
                     return
                 job = broker.enqueue(operation, payload)
@@ -270,6 +339,20 @@ def request_bridge(config: dict[str, Any], operation: str, payload: dict[str, An
         value = json.loads(raw) if raw else {}
         if not 200 <= response.status < 300:
             raise ValueError(f"bridge returned {response.status}: {value.get('error', 'request failed')}")
+        return value
+    finally:
+        connection.close()
+
+
+def bridge_status(config: dict[str, Any], timeout: float) -> dict[str, Any]:
+    connection = http.client.HTTPConnection(config["host"], int(config["port"]), timeout=timeout)
+    try:
+        connection.request("GET", "/v1/status", headers={"Authorization": f"Bearer {config['token']}"})
+        response = connection.getresponse()
+        raw = response.read()
+        value = json.loads(raw) if raw else {}
+        if not 200 <= response.status < 300:
+            raise ValueError(f"bridge returned {response.status}: {value.get('error', 'status failed')}")
         return value
     finally:
         connection.close()
@@ -314,6 +397,19 @@ def doctor(config_path: Path) -> tuple[dict[str, Any], bool]:
         udt = Path("/Applications/Adobe UXP Developer Tools.app")
     udt_version = app_version(udt) if udt.exists() else None
     check("Adobe UXP Developer Tool 2.2+", version_at_least(udt_version, (2, 2, 0)), f"{udt}: {udt_version or 'not found'}")
+    if sys.platform == "darwin":
+        developer_settings = Path("/Library/Application Support/Adobe/UXP/Developer/settings.json")
+    elif sys.platform == "win32":
+        common_files = os.environ.get("CommonProgramFiles")
+        developer_settings = Path(common_files) / "Adobe" / "UXP" / "Developer" / "settings.json" if common_files else None
+    else:
+        developer_settings = None
+    if developer_settings:
+        try:
+            developer_mode = json.loads(developer_settings.read_text(encoding="utf-8")).get("developer") is True
+        except (OSError, json.JSONDecodeError):
+            developer_mode = False
+        check("Adobe UXP developer mode", developer_mode, str(developer_settings))
     manifest_path = connector / "manifest.json"
     check("Bundled UXP manifest", manifest_path.is_file(), str(manifest_path))
     check("Bundled UXP runtime", (connector / "index.html").is_file() and (connector / "main.js").is_file(), str(connector))
@@ -366,6 +462,9 @@ def main() -> int:
     serve = sub.add_parser("serve", help="run the localhost-only broker")
     serve.add_argument("--request-timeout", type=float, default=30.0)
 
+    status = sub.add_parser("status", help="report authenticated broker and connector liveness")
+    status.add_argument("--timeout", type=float, default=3.0)
+
     req = sub.add_parser("request", help="send an allowlisted read request")
     req.add_argument("operation", choices=sorted(READ_OPERATIONS))
     req.add_argument("--payload", default="{}")
@@ -395,6 +494,10 @@ def main() -> int:
             print(f"Video Chef Premiere Bridge listening on http://{config['host']}:{config['port']}", flush=True)
             server.serve_forever()
             return 0
+        if args.command == "status":
+            value = bridge_status(config, args.timeout)
+            print(json.dumps(value, indent=2))
+            return 0 if value.get("connected") is True else 2
         if args.command == "request":
             print(json.dumps(request_bridge(config, args.operation, parse_payload(args.payload), args.timeout), indent=2))
             return 0

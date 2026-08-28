@@ -11,7 +11,11 @@
       label { display:block; font-weight:600; margin:14px 0 6px; }
       input { box-sizing:border-box; width:100%; background:#252525; color:#fff; border:1px solid #555; border-radius:5px; padding:8px; }
       button { background:#1664d9; color:#fff; border:0; border-radius:5px; font-weight:650; margin-top:12px; padding:8px 12px; }
+      button:disabled { opacity:.45; }
       button.secondary { background:#3a3a3a; margin-left:6px; }
+      .remember { align-items:center; color:#c7c7c7; display:flex; font-weight:400; gap:7px; margin:9px 0 0; }
+      .remember input { width:auto; }
+      .actions { display:flex; flex-wrap:wrap; }
       .state { border-left:3px solid #777; background:#222; margin-top:16px; padding:10px; white-space:pre-wrap; }
       .state.ok { border-color:#41b883; }
       .state.error { border-color:#ff4e36; }
@@ -24,8 +28,12 @@
     <p class="guard">Read-only connector: it can inspect the active sequence but cannot change a timeline.</p>
     <label for="token">Private bridge token</label>
     <input id="token" type="password" autocomplete="off" placeholder="Paste from premiere-bridge.json">
-    <button id="connect">Connect</button>
-    <button id="disconnect" class="secondary">Disconnect</button>
+    <label class="remember"><input id="remember" type="checkbox" checked>Remember securely in Premiere</label>
+    <div class="actions">
+      <button id="connect">Connect</button>
+      <button id="disconnect" class="secondary">Disconnect</button>
+      <button id="forget" class="secondary">Forget token</button>
+    </div>
     <div id="state" class="state">Disconnected</div>
     <script src="main.js"></script>
   </body>

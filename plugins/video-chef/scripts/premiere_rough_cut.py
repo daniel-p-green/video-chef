@@ -84,7 +84,7 @@ def build_plan(rows: list[dict[str, str]], target: str, fps: float, base_dir: Pa
         "execution": {
             "requested": False,
             "supported_by_bundled_connector": False,
-            "reason": "Bundled UXP connector 1.0 is read-only; review and approve this plan before any future write-capable connector is used.",
+            "reason": "Bundled UXP connector 1.1 is read-only; review and approve this plan before any future write-capable connector is used.",
         },
     }
     plan["plan_sha256"] = plan_digest(plan)

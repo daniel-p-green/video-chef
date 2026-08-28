@@ -12,8 +12,8 @@ from typing import Any
 
 def validate(snapshot: dict[str, Any]) -> list[str]:
     issues: list[str] = []
-    if snapshot.get("schema_version") != "1.0":
-        issues.append("schema_version must be 1.0")
+    if snapshot.get("schema_version") not in {"1.0", "1.1"}:
+        issues.append("schema_version must be 1.0 or 1.1")
     for key in ("captured_at", "project", "sequence", "tracks"):
         if key not in snapshot:
             issues.append(f"missing {key}")
@@ -75,10 +75,20 @@ def report(snapshot: dict[str, Any]) -> str:
         f"- Clip instances: `{len(video_items)} video / {len(audio_items)} audio`",
         f"- Unique sources: `{len(unique_sources)}`",
         f"- Disabled clip instances: `{disabled}`",
-        "",
-        "## Timeline evidence",
-        "",
     ]
+    inspection_issues = snapshot.get("issues", [])
+    if snapshot.get("partial") or inspection_issues:
+        lines.extend([
+            f"- Snapshot completeness: `partial` ({len(inspection_issues)} inspection issue(s))",
+            "",
+            "## Snapshot warnings",
+            "",
+        ])
+        for issue in inspection_issues:
+            lines.append(f"- `{issue.get('scope', 'unknown')}`: {issue.get('error', 'inspection failed')}")
+    else:
+        lines.append("- Snapshot completeness: `complete for declared fields`")
+    lines.extend(["", "## Timeline evidence", ""])
     for track in tracks:
         lines.append(f"### {track.get('name') or track['media_type'].title()} {int(track.get('index', 0)) + 1}")
         lines.append("")

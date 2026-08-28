@@ -16,14 +16,16 @@ Connect Codex to the active Premiere session through a private local broker and 
 
 ## Setup and doctor
 
-1. Run `python3 ../../scripts/premiere_bridge.py doctor`. This proves Premiere Pro 25.6+, UXP Developer Tool 2.2+, and the packaged connector shape. A missing private config is a warning, not a failed package.
+1. Run `python3 ../../scripts/premiere_bridge.py doctor`. This checks Premiere Pro 25.6+, UXP Developer Tool 2.2+, Adobe developer mode, the packaged connector, and the private config. A missing config is a warning; disabled Adobe developer mode is a failed live-bridge prerequisite.
 2. If no private config exists, run `python3 ../../scripts/premiere_bridge.py init`. Do not use `--force` unless the user explicitly wants to rotate the token.
 3. Load `../../premiere-uxp/video-chef-bridge/manifest.json` in Adobe UXP Developer Tool, launch it in the installed supported Premiere version, and open **Video Chef Bridge** from Premiere's Plugins menu.
 4. Start the broker with `python3 ../../scripts/premiere_bridge.py serve`.
 5. Copy the token directly from the private config into the UXP panel and connect. Do not echo it through terminal output.
 6. Prove the round trip with `python3 ../../scripts/premiere_bridge.py request ping`.
 
-Adobe's current UXP network guide warns that macOS can restrict plain HTTP. The connector uses loopback HTTP for development and never leaves the machine, but a passing package doctor does not prove Premiere accepted that transport. The ping is the required live transport proof; if it fails with a network permission error, stop and do not weaken the manifest to broad network access.
+Run `python3 ../../scripts/premiere_bridge.py status` when diagnosing a connection. Exit `0` means the authenticated connector heartbeat is live; exit `2` means the broker answered but no live connector is polling. After the first successful connection, the panel can cache the token in UXP secure storage. **Forget token** removes that cache.
+
+Adobe's current UXP network guide warns that macOS can restrict plain HTTP. The connector uses loopback HTTP for development and never leaves the machine, but a passing package doctor does not prove Premiere accepted that transport. The ping is the required live transport proof; if it fails with a network permission error, stop and do not weaken the manifest to broad network access. A registered connector with a stale heartbeat is treated as disconnected rather than timing every request out.
 
 Loading or launching a UXP plugin changes local Adobe development state. Do it only when the user asked to set up or use the bridge; doctor alone is read-only.
 

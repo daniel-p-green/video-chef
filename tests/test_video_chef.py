@@ -26,7 +26,7 @@ class PackageTests(unittest.TestCase):
         self.assertEqual(market["plugins"][0]["name"], "video-chef")
         self.assertEqual(market["plugins"][0]["source"]["path"], "./plugins/video-chef")
         self.assertEqual(manifest["name"], "video-chef")
-        self.assertEqual(manifest["version"].split("+", 1)[0], "1.2.0")
+        self.assertEqual(manifest["version"].split("+", 1)[0], "1.2.1")
 
     def test_all_skills_have_valid_identity_and_no_placeholders(self):
         skills = sorted((PLUGIN / "skills").glob("*/SKILL.md"))
@@ -60,6 +60,7 @@ class PackageTests(unittest.TestCase):
         capabilities = json.loads((PLUGIN / "premiere-uxp/video-chef-bridge/capabilities.json").read_text())
         self.assertEqual(manifest["host"]["app"], "premierepro")
         self.assertEqual(manifest["host"]["minVersion"], "25.6.0")
+        self.assertEqual(manifest["version"], "1.1.0")
         self.assertEqual(manifest["requiredPermissions"]["network"]["domains"], ["http://127.0.0.1:17841"])
         self.assertFalse(capabilities["mutationEnabled"])
         self.assertEqual(set(capabilities["capabilities"]), {"ping", "snapshot_active_sequence"})
@@ -67,9 +68,20 @@ class PackageTests(unittest.TestCase):
         self.assertNotIn("eval(", runtime)
         self.assertNotIn("Function(", runtime)
         self.assertNotIn("executeTransaction", runtime)
+        self.assertIn("secureStorage", runtime)
+        self.assertNotIn("localStorage", runtime)
+        self.assertIn("instance_id", runtime)
 
 
 class ToolTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which("node"), "Node.js is unavailable")
+    def test_uxp_connector_runtime_contract(self):
+        completed = subprocess.run([
+            "node", str(ROOT / "tests/uxp_connector_harness.js"),
+            str(PLUGIN / "premiere-uxp/video-chef-bridge/main.js"),
+        ], check=True, capture_output=True, text=True)
+        self.assertIn("UXP connector harness passed", completed.stdout)
+
     def test_premiere_sequence_snapshot_and_guarded_rough_cut(self):
         with tempfile.TemporaryDirectory() as raw:
             temp = Path(raw)
@@ -82,6 +94,20 @@ class ToolTests(unittest.TestCase):
             self.assertIn("Launch Film v03", text)
             self.assertIn("0.000-5.000", text)
             self.assertIn("interpretation boundary", text)
+
+            partial_snapshot = json.loads((ROOT / "tests/fixtures/premiere-snapshot.json").read_text())
+            partial_snapshot["schema_version"] = "1.1"
+            partial_snapshot["partial"] = True
+            partial_snapshot["issues"] = [{"scope": "video_track_1_item_2", "error": "fixture inspection failure"}]
+            partial_path = temp / "partial-snapshot.json"
+            partial_report = temp / "partial-sequence.md"
+            partial_path.write_text(json.dumps(partial_snapshot))
+            subprocess.run([
+                "python3", str(SCRIPTS / "premiere_sequence_analysis.py"),
+                str(partial_path), str(partial_report),
+            ], check=True)
+            self.assertIn("Snapshot completeness: `partial`", partial_report.read_text())
+            self.assertIn("fixture inspection failure", partial_report.read_text())
 
             plan = temp / "plan.json"
             subprocess.run([
@@ -127,11 +153,17 @@ class ToolTests(unittest.TestCase):
             ], check=True, capture_output=True, text=True)
             self.assertEqual(config.stat().st_mode & 0o077, 0)
             details = json.loads(config.read_text())
-            headers = {"Authorization": f"Bearer {details['token']}", "Content-Type": "application/json"}
+            headers = {
+                "Authorization": f"Bearer {details['token']}",
+                "Content-Type": "application/json",
+                "X-Video-Chef-Connector-ID": "test-connector-1",
+            }
 
-            def local_request(method, path, body=None, authorized=True, timeout=1):
+            def local_request(method, path, body=None, authorized=True, timeout=1, connector_id=None):
                 connection = http.client.HTTPConnection("127.0.0.1", port, timeout=timeout)
                 request_headers = dict(headers) if authorized else {"Authorization": "Bearer wrong"}
+                if connector_id is not None:
+                    request_headers["X-Video-Chef-Connector-ID"] = connector_id
                 encoded = json.dumps(body).encode() if body is not None else None
                 try:
                     connection.request(method, path, body=encoded, headers=request_headers)
@@ -158,9 +190,18 @@ class ToolTests(unittest.TestCase):
 
                 status, _ = local_request("POST", "/v1/connector/register", {
                     "protocol_version": "1.0", "connector_version": "test",
-                    "premiere_version": "test", "capabilities": ["ping"],
+                    "premiere_version": "test", "instance_id": "test-connector-1",
+                    "capabilities": ["ping"],
                 })
                 self.assertEqual(status, 200)
+                status, connector_status = local_request("GET", "/v1/status")
+                self.assertEqual(status, 200)
+                self.assertTrue(connector_status["connected"])
+                self.assertEqual(connector_status["connector"]["instance_id"], "test-connector-1")
+                status, _ = local_request(
+                    "GET", "/v1/connector/next", connector_id="superseded-connector"
+                )
+                self.assertEqual(status, 409)
                 status, _ = local_request("OPTIONS", "/v1/connector/register", authorized=False)
                 self.assertEqual(status, 204)
 
@@ -191,6 +232,18 @@ class ToolTests(unittest.TestCase):
                 self.assertEqual(status, 403)
                 status, _ = local_request("GET", "/v1/status", authorized=False)
                 self.assertEqual(status, 401)
+                status, body = local_request("POST", "/v1/connector/unregister", {"instance_id": "wrong-connector"})
+                self.assertEqual(status, 200)
+                self.assertFalse(body["removed"])
+                status, body = local_request("POST", "/v1/connector/unregister", {"instance_id": "test-connector-1"})
+                self.assertEqual(status, 200)
+                self.assertTrue(body["removed"])
+                disconnected = subprocess.run([
+                    "python3", str(SCRIPTS / "premiere_bridge.py"), "--config", str(config),
+                    "status", "--timeout", "1",
+                ], capture_output=True, text=True)
+                self.assertEqual(disconnected.returncode, 2)
+                self.assertFalse(json.loads(disconnected.stdout)["connected"])
             finally:
                 server.terminate()
                 server.wait(timeout=5)
