@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.0 — 2026-08-27
+
+- Added whole-project asset inventory covering media, graphics, brand files, documents, captions, fonts, and editable projects.
+- Added executable local Whisper/MLX Whisper transcript processing with word timing, reviewed speaker maps, and production-cue detection.
+- Added scene-boundary detection and bounded frame-sequence extraction for detailed picture and animation inspection.
+- Added full-runtime screen-review and speaker-map records.
+- Added an explicit source-fidelity map and corrected attribution to Brent Schooley.
+- Expanded functional tests for the new workflows.
+
 ## 1.0.0 — 2026-08-27
 
 - Added eight routed professional video-production skills.
