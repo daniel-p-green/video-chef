@@ -1,6 +1,6 @@
 {
   "name": "video-chef",
-  "version": "1.2.1",
+  "version": "1.2.2+codex.20260828042808",
   "description": "Professional video development with live, safety-gated Premiere sequence intelligence from story lock through editorial, sound, graphics, finishing, QC, and delivery.",
   "author": {
     "name": "Daniel Green",
@@ -9,7 +9,15 @@
   "homepage": "https://github.com/daniel-p-green/video-chef",
   "repository": "https://github.com/daniel-p-green/video-chef",
   "license": "MIT",
-  "keywords": ["video", "editing", "premiere-pro", "after-effects", "ffmpeg", "captions", "quality-control"],
+  "keywords": [
+    "video",
+    "editing",
+    "premiere-pro",
+    "after-effects",
+    "ffmpeg",
+    "captions",
+    "quality-control"
+  ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Video Chef",

@@ -14,7 +14,10 @@ import os
 import plistlib
 import queue
 import secrets
+import shutil
 import socketserver
+import ssl
+import subprocess
 import sys
 import threading
 import time
@@ -28,11 +31,13 @@ from pathlib import Path
 from typing import Any
 
 PROTOCOL_VERSION = "1.0"
-CONNECTOR_VERSION = "1.1.0"
+CONNECTOR_VERSION = "1.2.1"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 17841
 CONNECTOR_STALE_AFTER = 5.0
 READ_OPERATIONS = {"ping", "snapshot_active_sequence"}
+TLS_CERT_NAME = "premiere-bridge-cert.pem"
+TLS_KEY_NAME = "premiere-bridge-key.pem"
 
 
 class LocalThreadingHTTPServer(ThreadingHTTPServer):
@@ -46,6 +51,73 @@ class LocalThreadingHTTPServer(ThreadingHTTPServer):
 
 def default_config_path() -> Path:
     return Path.home() / ".codex" / "video-chef" / "premiere-bridge.json"
+
+
+def default_tls_paths(config_path: Path) -> tuple[Path, Path]:
+    return config_path.parent / TLS_CERT_NAME, config_path.parent / TLS_KEY_NAME
+
+
+def mkcert_ca_path() -> Path | None:
+    executable = shutil.which("mkcert")
+    if not executable:
+        return None
+    try:
+        completed = subprocess.run(
+            [executable, "-CAROOT"], check=False, capture_output=True, text=True, timeout=10
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if completed.returncode != 0:
+        return None
+    root = Path(completed.stdout.strip()) / "rootCA.pem"
+    return root if root.is_file() else None
+
+
+def setup_tls(cert_path: Path, key_path: Path, force: bool = False) -> Path:
+    executable = shutil.which("mkcert")
+    if not executable:
+        raise ValueError("mkcert is required; install it first and review its local-CA security model")
+    if (cert_path.exists() or key_path.exists()) and not force:
+        raise FileExistsError(f"TLS material already exists: {cert_path} or {key_path}")
+    cert_path.parent.mkdir(parents=True, exist_ok=True)
+    key_path.parent.mkdir(parents=True, exist_ok=True)
+    suffix = secrets.token_hex(8)
+    staged_cert = cert_path.with_name(f".{cert_path.name}.{suffix}.tmp")
+    staged_key = key_path.with_name(f".{key_path.name}.{suffix}.tmp")
+    try:
+        completed = subprocess.run([
+            executable,
+            "-cert-file", str(staged_cert),
+            "-key-file", str(staged_key),
+            DEFAULT_HOST, "localhost", "::1",
+        ], check=False, capture_output=True, text=True, timeout=30)
+        if completed.returncode != 0:
+            raise ValueError(completed.stderr.strip() or "mkcert failed")
+        staged_cert.chmod(0o644)
+        staged_key.chmod(0o600)
+        os.replace(staged_key, key_path)
+        os.replace(staged_cert, cert_path)
+    finally:
+        staged_cert.unlink(missing_ok=True)
+        staged_key.unlink(missing_ok=True)
+    ca_path = mkcert_ca_path()
+    if not ca_path:
+        raise ValueError("mkcert created the leaf certificate but its rootCA.pem was not found")
+    return ca_path
+
+
+def client_ssl_context(ca_cert: Path | None) -> ssl.SSLContext:
+    context = ssl.create_default_context(cafile=str(ca_cert) if ca_cert and ca_cert.is_file() else None)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    return context
+
+
+def make_https_connection(
+    config: dict[str, Any], timeout: float, ca_cert: Path | None
+) -> http.client.HTTPSConnection:
+    return http.client.HTTPSConnection(
+        config["host"], int(config["port"]), timeout=timeout, context=client_ssl_context(ca_cert)
+    )
 
 
 def load_config(path: Path) -> dict[str, Any]:
@@ -326,9 +398,12 @@ def make_handler(broker: Broker, request_timeout: float):
     return Handler
 
 
-def request_bridge(config: dict[str, Any], operation: str, payload: dict[str, Any], timeout: float) -> dict[str, Any]:
+def request_bridge(
+    config: dict[str, Any], operation: str, payload: dict[str, Any], timeout: float,
+    ca_cert: Path | None,
+) -> dict[str, Any]:
     body = json.dumps({"operation": operation, "payload": payload}).encode("utf-8")
-    connection = http.client.HTTPConnection(config["host"], int(config["port"]), timeout=timeout)
+    connection = make_https_connection(config, timeout, ca_cert)
     try:
         connection.request("POST", "/v1/request", body=body, headers={
             "Authorization": f"Bearer {config['token']}",
@@ -344,8 +419,8 @@ def request_bridge(config: dict[str, Any], operation: str, payload: dict[str, An
         connection.close()
 
 
-def bridge_status(config: dict[str, Any], timeout: float) -> dict[str, Any]:
-    connection = http.client.HTTPConnection(config["host"], int(config["port"]), timeout=timeout)
+def bridge_status(config: dict[str, Any], timeout: float, ca_cert: Path | None) -> dict[str, Any]:
+    connection = make_https_connection(config, timeout, ca_cert)
     try:
         connection.request("GET", "/v1/status", headers={"Authorization": f"Bearer {config['token']}"})
         response = connection.getresponse()
@@ -376,7 +451,9 @@ def version_at_least(actual: str | None, required: tuple[int, ...]) -> bool:
     return parts + (0,) * (len(required) - len(parts)) >= required
 
 
-def doctor(config_path: Path) -> tuple[dict[str, Any], bool]:
+def doctor(
+    config_path: Path, cert_path: Path | None = None, key_path: Path | None = None
+) -> tuple[dict[str, Any], bool]:
     plugin_root = Path(__file__).resolve().parents[1]
     connector = plugin_root / "premiere-uxp" / "video-chef-bridge"
     checks: list[dict[str, Any]] = []
@@ -417,7 +494,7 @@ def doctor(config_path: Path) -> tuple[dict[str, Any], bool]:
         try:
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             domains = manifest.get("requiredPermissions", {}).get("network", {}).get("domains", [])
-            safe = domains == [f"http://{DEFAULT_HOST}:{DEFAULT_PORT}"]
+            safe = domains == ["https://localhost"]
             check("Localhost-only network permission", safe, json.dumps(domains))
         except (OSError, json.JSONDecodeError) as exc:
             check("UXP manifest parses", False, str(exc))
@@ -428,6 +505,33 @@ def doctor(config_path: Path) -> tuple[dict[str, Any], bool]:
         check("Read-only connector declaration", safe_capabilities, str(capabilities_path))
     except (OSError, json.JSONDecodeError) as exc:
         check("Read-only connector declaration", False, str(exc))
+    default_cert, default_key = default_tls_paths(config_path)
+    cert_path = cert_path or default_cert
+    key_path = key_path or default_key
+    check("Bridge TLS certificate", cert_path.is_file(), str(cert_path))
+    check("Bridge TLS private key", key_path.is_file(), str(key_path))
+    if key_path.is_file():
+        key_mode = key_path.stat().st_mode & 0o777
+        check("Bridge TLS private-key permissions", key_mode & 0o077 == 0, oct(key_mode))
+    if cert_path.is_file() and key_path.is_file():
+        try:
+            context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            context.load_cert_chain(certfile=str(cert_path), keyfile=str(key_path))
+            check("Bridge TLS key pair", True, str(cert_path))
+        except (OSError, ssl.SSLError) as exc:
+            check("Bridge TLS key pair", False, str(exc))
+        if sys.platform == "darwin":
+            try:
+                trusted = subprocess.run(
+                    ["security", "verify-cert", "-c", str(cert_path), "-p", "ssl", "-s", DEFAULT_HOST],
+                    check=False, capture_output=True, text=True, timeout=15,
+                )
+                detail = trusted.stderr.strip() or trusted.stdout.strip() or "macOS trust evaluation passed"
+                check("Bridge TLS trusted by macOS", trusted.returncode == 0, detail)
+            except (OSError, subprocess.SubprocessError) as exc:
+                check("Bridge TLS trusted by macOS", False, str(exc))
+    ca_path = mkcert_ca_path()
+    check("mkcert local CA", ca_path is not None, str(ca_path or "not found"), required=False)
     try:
         config = load_config(config_path)
         mode = config_path.stat().st_mode & 0o777
@@ -447,14 +551,30 @@ def parse_payload(raw: str) -> dict[str, Any]:
     return value
 
 
+def write_json_output(path: Path, value: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    staged = path.with_name(f".{path.name}.{secrets.token_hex(8)}.tmp")
+    try:
+        staged.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
+        os.replace(staged, path)
+    finally:
+        staged.unlink(missing_ok=True)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=default_config_path())
+    parser.add_argument("--cert", type=Path, help="TLS leaf certificate (defaults beside the private config)")
+    parser.add_argument("--key", type=Path, help="TLS private key (defaults beside the private config)")
+    parser.add_argument("--ca-cert", type=Path, help="CA certificate for broker client verification")
     sub = parser.add_subparsers(dest="command", required=True)
 
     init = sub.add_parser("init", help="create a private localhost bridge configuration")
     init.add_argument("--port", type=int, default=DEFAULT_PORT)
     init.add_argument("--force", action="store_true")
+
+    tls = sub.add_parser("setup-tls", help="generate a per-machine HTTPS leaf certificate with mkcert")
+    tls.add_argument("--force", action="store_true")
 
     doc = sub.add_parser("doctor", help="check local Premiere bridge prerequisites")
     doc.add_argument("--json", action="store_true")
@@ -469,16 +589,33 @@ def main() -> int:
     req.add_argument("operation", choices=sorted(READ_OPERATIONS))
     req.add_argument("--payload", default="{}")
     req.add_argument("--timeout", type=float, default=35.0)
+    req.add_argument("--output", type=Path, help="atomically write the broker envelope as JSON")
 
     args = parser.parse_args()
+    default_cert, default_key = default_tls_paths(args.config)
+    cert_path = args.cert or default_cert
+    key_path = args.key or default_key
+    ca_cert = args.ca_cert or mkcert_ca_path()
     try:
         if args.command == "init":
             data = initialize_config(args.config, args.port, args.force)
             print(json.dumps({"config": str(args.config), "host": data["host"], "port": data["port"]}, indent=2))
             print("Paste the token from the private config into the Video Chef Bridge panel; do not share it.", file=sys.stderr)
             return 0
+        if args.command == "setup-tls":
+            ca_path = setup_tls(cert_path, key_path, args.force)
+            print(json.dumps({
+                "certificate": str(cert_path),
+                "private_key": str(key_path),
+                "ca_certificate": str(ca_path),
+            }, indent=2))
+            print(
+                "Run doctor next. If macOS trust fails, review mkcert's security model and explicitly run `mkcert -install`.",
+                file=sys.stderr,
+            )
+            return 0
         if args.command == "doctor":
-            report, passed = doctor(args.config)
+            report, passed = doctor(args.config, cert_path, key_path)
             if args.json:
                 print(json.dumps(report, indent=2))
             else:
@@ -491,17 +628,31 @@ def main() -> int:
         if args.command == "serve":
             broker = Broker(config["token"])
             server = LocalThreadingHTTPServer((config["host"], int(config["port"])), make_handler(broker, args.request_timeout))
-            print(f"Video Chef Premiere Bridge listening on http://{config['host']}:{config['port']}", flush=True)
+            tls_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            tls_context.minimum_version = ssl.TLSVersion.TLSv1_2
+            tls_context.load_cert_chain(certfile=str(cert_path), keyfile=str(key_path))
+            server.socket = tls_context.wrap_socket(server.socket, server_side=True)
+            print(f"Video Chef Premiere Bridge listening on https://{config['host']}:{config['port']}", flush=True)
             server.serve_forever()
             return 0
         if args.command == "status":
-            value = bridge_status(config, args.timeout)
+            value = bridge_status(config, args.timeout, ca_cert)
             print(json.dumps(value, indent=2))
             return 0 if value.get("connected") is True else 2
         if args.command == "request":
-            print(json.dumps(request_bridge(config, args.operation, parse_payload(args.payload), args.timeout), indent=2))
+            value = request_bridge(
+                config, args.operation, parse_payload(args.payload), args.timeout, ca_cert
+            )
+            if args.output:
+                write_json_output(args.output, value)
+                print(str(args.output))
+            else:
+                print(json.dumps(value, indent=2))
             return 0
-    except (OSError, ValueError, json.JSONDecodeError, urllib.error.URLError, http.client.HTTPException) as exc:
+    except (
+        OSError, ValueError, json.JSONDecodeError, urllib.error.URLError,
+        http.client.HTTPException, subprocess.SubprocessError,
+    ) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     return 1

@@ -6,6 +6,7 @@ import os
 import re
 import shutil
 import socket
+import ssl
 import subprocess
 import tempfile
 import threading
@@ -26,7 +27,7 @@ class PackageTests(unittest.TestCase):
         self.assertEqual(market["plugins"][0]["name"], "video-chef")
         self.assertEqual(market["plugins"][0]["source"]["path"], "./plugins/video-chef")
         self.assertEqual(manifest["name"], "video-chef")
-        self.assertEqual(manifest["version"].split("+", 1)[0], "1.2.1")
+        self.assertEqual(manifest["version"].split("+", 1)[0], "1.2.2")
 
     def test_all_skills_have_valid_identity_and_no_placeholders(self):
         skills = sorted((PLUGIN / "skills").glob("*/SKILL.md"))
@@ -60,8 +61,8 @@ class PackageTests(unittest.TestCase):
         capabilities = json.loads((PLUGIN / "premiere-uxp/video-chef-bridge/capabilities.json").read_text())
         self.assertEqual(manifest["host"]["app"], "premierepro")
         self.assertEqual(manifest["host"]["minVersion"], "25.6.0")
-        self.assertEqual(manifest["version"], "1.1.0")
-        self.assertEqual(manifest["requiredPermissions"]["network"]["domains"], ["http://127.0.0.1:17841"])
+        self.assertEqual(manifest["version"], "1.2.1")
+        self.assertEqual(manifest["requiredPermissions"]["network"]["domains"], ["https://localhost"])
         self.assertFalse(capabilities["mutationEnabled"])
         self.assertEqual(set(capabilities["capabilities"]), {"ping", "snapshot_active_sequence"})
         runtime = (PLUGIN / "premiere-uxp/video-chef-bridge/main.js").read_text()
@@ -71,6 +72,8 @@ class PackageTests(unittest.TestCase):
         self.assertIn("secureStorage", runtime)
         self.assertNotIn("localStorage", runtime)
         self.assertIn("instance_id", runtime)
+        self.assertIn("ClipProjectItem.cast", runtime)
+        self.assertNotIn("http://", runtime)
 
 
 class ToolTests(unittest.TestCase):
@@ -95,7 +98,19 @@ class ToolTests(unittest.TestCase):
             self.assertIn("0.000-5.000", text)
             self.assertIn("interpretation boundary", text)
 
-            partial_snapshot = json.loads((ROOT / "tests/fixtures/premiere-snapshot.json").read_text())
+            fixture_snapshot = json.loads((ROOT / "tests/fixtures/premiere-snapshot.json").read_text())
+            envelope_path = temp / "bridge-envelope.json"
+            envelope_report = temp / "envelope-sequence.md"
+            validated_path = temp / "validated-snapshot.json"
+            envelope_path.write_text(json.dumps({"result": {"ok": True, "data": fixture_snapshot}}))
+            subprocess.run([
+                "python3", str(SCRIPTS / "premiere_sequence_analysis.py"),
+                str(envelope_path), str(envelope_report), "--validated-json", str(validated_path),
+            ], check=True)
+            self.assertIn("Launch Film v03", envelope_report.read_text())
+            self.assertEqual(json.loads(validated_path.read_text())["sequence"]["name"], "Launch Film v03")
+
+            partial_snapshot = fixture_snapshot
             partial_snapshot["schema_version"] = "1.1"
             partial_snapshot["partial"] = True
             partial_snapshot["issues"] = [{"scope": "video_track_1_item_2", "error": "fixture inspection failure"}]
@@ -140,10 +155,20 @@ class ToolTests(unittest.TestCase):
             self.assertEqual(blocked.returncode, 1)
             self.assertIn("VC_ROUGH_CUT_", blocked.stderr)
 
+    @unittest.skipUnless(shutil.which("openssl"), "OpenSSL is unavailable")
     def test_premiere_broker_authenticated_round_trip_and_mutation_guard(self):
         with tempfile.TemporaryDirectory() as raw:
             temp = Path(raw)
             config = temp / "bridge.json"
+            cert = temp / "bridge-cert.pem"
+            key = temp / "bridge-key.pem"
+            subprocess.run([
+                "openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
+                "-subj", "/CN=127.0.0.1",
+                "-addext", "subjectAltName=IP:127.0.0.1,DNS:localhost",
+                "-keyout", str(key), "-out", str(cert),
+            ], check=True, capture_output=True, text=True)
+            key.chmod(0o600)
             with socket.socket() as sock:
                 sock.bind(("127.0.0.1", 0))
                 port = sock.getsockname()[1]
@@ -160,7 +185,8 @@ class ToolTests(unittest.TestCase):
             }
 
             def local_request(method, path, body=None, authorized=True, timeout=1, connector_id=None):
-                connection = http.client.HTTPConnection("127.0.0.1", port, timeout=timeout)
+                context = ssl.create_default_context(cafile=str(cert))
+                connection = http.client.HTTPSConnection("127.0.0.1", port, timeout=timeout, context=context)
                 request_headers = dict(headers) if authorized else {"Authorization": "Bearer wrong"}
                 if connector_id is not None:
                     request_headers["X-Video-Chef-Connector-ID"] = connector_id
@@ -175,6 +201,7 @@ class ToolTests(unittest.TestCase):
                     connection.close()
             server = subprocess.Popen([
                 "python3", str(SCRIPTS / "premiere_bridge.py"), "--config", str(config),
+                "--cert", str(cert), "--key", str(key), "--ca-cert", str(cert),
                 "serve", "--request-timeout", "3",
             ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             try:
@@ -223,6 +250,7 @@ class ToolTests(unittest.TestCase):
                 worker.start()
                 completed = subprocess.run([
                     "python3", str(SCRIPTS / "premiere_bridge.py"), "--config", str(config),
+                    "--ca-cert", str(cert),
                     "request", "ping", "--timeout", "4",
                 ], check=True, capture_output=True, text=True)
                 worker.join(timeout=2)
@@ -240,6 +268,7 @@ class ToolTests(unittest.TestCase):
                 self.assertTrue(body["removed"])
                 disconnected = subprocess.run([
                     "python3", str(SCRIPTS / "premiere_bridge.py"), "--config", str(config),
+                    "--ca-cert", str(cert),
                     "status", "--timeout", "1",
                 ], capture_output=True, text=True)
                 self.assertEqual(disconnected.returncode, 2)

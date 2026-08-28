@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.2 — 2026-08-27
+
+- Replaced the macOS-incompatible plain-HTTP Premiere loopback transport with TLS 1.2+ on `https://127.0.0.1:17841`.
+- Added per-machine `mkcert` leaf-certificate setup without silently installing or exporting the local CA.
+- Expanded doctor checks for the exact loopback HTTPS manifest allowlist, certificate/key presence, private-key permissions, key-pair validity, and macOS trust evaluation.
+- Added certificate-verified HTTPS broker and UXP endpoint regression coverage while preserving token authentication and the read-only capability guard.
+- Correctly casts base Premiere project items to `ClipProjectItem` before resolving source-media paths, restoring provenance evidence in live snapshots.
+
 ## 1.2.1 — 2026-08-27
 
 - Hardened the Premiere connector with heartbeat-based liveness, clean instance unregister, authenticated status reporting, request timeouts, and private-network preflight support.

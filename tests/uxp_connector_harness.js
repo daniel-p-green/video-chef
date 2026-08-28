@@ -96,7 +96,11 @@ const context = {
   },
   require: name => {
     if (name === "premierepro") {
-      return {Project: {getActiveProject: async () => project}, Constants: {TrackItemType: {CLIP: 1}}};
+      return {
+        Project: {getActiveProject: async () => project},
+        ClipProjectItem: {cast: projectItem => projectItem},
+        Constants: {TrackItemType: {CLIP: 1}}
+      };
     }
     if (name === "uxp") {
       return {
@@ -129,8 +133,9 @@ async function main() {
   if (snapshot.tracks[0].items[0].media_path !== "/fixture/source.mp4") throw new Error("media evidence missing");
   const register = requests.find(entry => entry.url.endsWith("/v1/connector/register"));
   const registration = JSON.parse(register.options.body);
-  if (!registration.instance_id || registration.connector_version !== "1.1.0") throw new Error("registration identity missing");
+  if (!registration.instance_id || registration.connector_version !== "1.2.1") throw new Error("registration identity missing");
   if (!register.options.headers["X-Video-Chef-Connector-ID"]) throw new Error("connector header missing");
+  if (!register.url.startsWith("https://localhost:17841/")) throw new Error("connector did not use loopback HTTPS");
   await elements.disconnect.listeners.click();
   if (elements.disconnect.disabled !== true) throw new Error("disconnect controls are incorrect");
   process.stdout.write("UXP connector harness passed\n");

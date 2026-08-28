@@ -42,11 +42,11 @@ The Adobe skill includes all scripting guides published by the docsforadobe orga
 - `transcript_workbench.py` runs local Whisper/MLX Whisper or normalizes existing Whisper JSON into readable, word-level, speaker-aware, and production-cue records.
 - `media_qc.py` performs full decode, black/freeze detection, and EBU loudness analysis.
 - `subtitle_qc.py` checks SRT/WebVTT timing, overlap, line length, line count, and reading speed.
-- `premiere_bridge.py` initializes, diagnoses, serves, reports live connector heartbeat status, and queries the private read-only Premiere bridge.
+- `premiere_bridge.py` initializes, provisions per-machine loopback TLS, diagnoses, serves, reports live connector heartbeat status, queries the private read-only Premiere bridge, and can atomically preserve exact response envelopes for downstream analysis.
 - `premiere_sequence_analysis.py` validates live sequence snapshots and writes timestamped evidence reports.
 - `premiere_rough_cut.py` validates transcript selects and creates a deterministic plan-only assembly record.
 
-The plugin bundles an original Premiere UXP panel under `premiere-uxp/video-chef-bridge`. Connector 1.1 is intentionally read-only: it can prove live connectivity, securely cache the private token in Adobe UXP storage, and inspect the active project and sequence, but it cannot alter a timeline. Rough-cut execution remains gated until a write-capable connector can prove project identity, plan identity, isolated sequence creation, undoability, post-edit reinspection, and failure-safe restoration inside Premiere.
+The plugin bundles an original Premiere UXP panel under `premiere-uxp/video-chef-bridge`. Connector 1.2 is intentionally read-only: it can prove live connectivity over loopback HTTPS, securely cache the private token in Adobe UXP storage, and inspect the active project and sequence, but it cannot alter a timeline. Rough-cut execution remains gated until a write-capable connector can prove project identity, plan identity, isolated sequence creation, undoability, post-edit reinspection, and failure-safe restoration inside Premiere.
 
 The plugin also includes templates for the creative brief, edit plan, selects, rights, speaker mapping, full-runtime screen review, audio post, caption QA, delivery specification, decision/change lineage, and master QA.
 
@@ -67,7 +67,7 @@ The plugin also includes templates for the creative brief, edit plan, selects, r
 - `ffmpeg` and `ffprobe` for media inventory, contact sheets, and automated QC.
 - Local OpenAI Whisper or MLX Whisper is optional for direct transcription; existing Whisper JSON can be processed without either engine. Model selection and downloads are explicit.
 - Adobe applications only when using the Adobe automation skill.
-- Premiere Pro 25.6 or later and Adobe UXP Developer Tool 2.2 or later when using the live Premiere bridge. The default connector network permission is restricted to `127.0.0.1:17841`. A successful in-Premiere ping remains the required live transport proof, especially on macOS where Adobe documents restrictions on plain HTTP.
+- Premiere Pro 25.6 or later, Adobe UXP Developer Tool 2.2 or later, and `mkcert` when using the live Premiere bridge. Adobe's manifest grammar allowlists the loopback HTTPS domain as `https://localhost`; the connector itself uses only port `17841`, and the broker binds only that port on `127.0.0.1`. Video Chef generates a per-machine leaf certificate but never installs a local root CA silently; users must review that trust decision themselves. A successful in-Premiere ping remains the required live transport proof.
 
 Destination-specific codec, loudness, caption, accessibility, and platform requirements can change. Video Chef records and verifies the intended delivery specification rather than assuming one universal preset.
 

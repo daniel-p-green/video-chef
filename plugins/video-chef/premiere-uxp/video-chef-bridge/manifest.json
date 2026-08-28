@@ -2,7 +2,7 @@
   "id": "com.danielgreen.videochef.bridge",
   "name": "Video Chef Premiere Bridge",
   "shortname": "VideoChef",
-  "version": "1.1.0",
+  "version": "1.2.1",
   "main": "index.html",
   "host": {
     "app": "premierepro",
@@ -12,7 +12,7 @@
   "requiredPermissions": {
     "network": {
       "domains": [
-        "http://127.0.0.1:17841"
+        "https://localhost"
       ]
     }
   },

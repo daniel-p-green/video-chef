@@ -5,9 +5,35 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import secrets
 import sys
 from pathlib import Path
 from typing import Any
+
+
+def unwrap_snapshot(value: dict[str, Any]) -> dict[str, Any]:
+    if "schema_version" in value:
+        return value
+    result = value.get("result")
+    if not isinstance(result, dict):
+        raise ValueError("input is neither a snapshot nor a broker response envelope")
+    if result.get("ok") is not True:
+        raise ValueError(f"bridge request failed: {result.get('error', 'unknown error')}")
+    snapshot = result.get("data")
+    if not isinstance(snapshot, dict):
+        raise ValueError("bridge response envelope is missing result.data")
+    return snapshot
+
+
+def write_text_atomic(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    staged = path.with_name(f".{path.name}.{secrets.token_hex(8)}.tmp")
+    try:
+        staged.write_text(content, encoding="utf-8")
+        os.replace(staged, path)
+    finally:
+        staged.unlink(missing_ok=True)
 
 
 def validate(snapshot: dict[str, Any]) -> list[str]:
@@ -116,16 +142,16 @@ def main() -> int:
     parser.add_argument("--validated-json", type=Path)
     args = parser.parse_args()
     try:
-        snapshot = json.loads(args.snapshot.read_text(encoding="utf-8"))
-        if not isinstance(snapshot, dict):
+        value = json.loads(args.snapshot.read_text(encoding="utf-8"))
+        if not isinstance(value, dict):
             raise ValueError("snapshot root must be an object")
+        snapshot = unwrap_snapshot(value)
         issues = validate(snapshot)
         if issues:
             raise ValueError("; ".join(issues))
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(report(snapshot), encoding="utf-8")
+        write_text_atomic(args.output, report(snapshot))
         if args.validated_json:
-            args.validated_json.write_text(json.dumps(snapshot, indent=2) + "\n", encoding="utf-8")
+            write_text_atomic(args.validated_json, json.dumps(snapshot, indent=2) + "\n")
         print(f"Wrote {args.output}")
         return 0
     except (OSError, ValueError, json.JSONDecodeError) as exc:

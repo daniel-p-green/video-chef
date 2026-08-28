@@ -2,9 +2,9 @@
 
 ## Architecture
 
-The Python broker listens on `127.0.0.1:17841`. The Premiere UXP panel polls it as a connector. Codex sends requests to the broker; the connector executes an allowlisted Premiere DOM read and posts the result. All endpoints require the same private bearer token.
+The Python broker binds only to `127.0.0.1:17841` with TLS 1.2+. The Premiere UXP panel reaches it through the manifest-compatible `https://localhost:17841` origin. Codex sends certificate-verified requests directly to the loopback address; the connector executes an allowlisted Premiere DOM read and posts the result. All endpoints require the same private bearer token.
 
-The broker uses protocol `1.0`; connector `1.1` adds liveness and secure local token caching without changing the wire protocol. The connector advertises `ping` and `snapshot_active_sequence`, plus `mutation_enabled: false`. The broker rejects undeclared capabilities, arbitrary operations, and any write request.
+The broker uses protocol `1.0`; connector `1.2.1` adds macOS-compatible loopback HTTPS and correctly resolves clip media paths through Premiere's `ClipProjectItem` API without changing the wire protocol. It retains connector 1.1 liveness and secure local token caching. The connector advertises `ping` and `snapshot_active_sequence`, plus `mutation_enabled: false`. The broker rejects undeclared capabilities, arbitrary operations, and any write request.
 
 ## Endpoints
 
@@ -22,7 +22,8 @@ The broker uses protocol `1.0`; connector `1.1` adds liveness and secure local t
 - `503`: no UXP connector is registered, or its heartbeat is stale. Start the broker, launch the panel in Premiere, and connect.
 - `504`: Premiere did not answer before the broker timeout. Confirm the panel remains open and Premiere is responsive; retry the read once.
 - `501`: the connector does not advertise that capability. Do not bypass negotiation.
+- TLS or certificate error: run doctor. Regenerate only the leaf with `setup-tls --force` when needed; do not disable verification or silently trust a new local CA.
 
 ## Mutation policy
 
-No write capability exists in connector 1.1. A future write connector must use a separate capability version, an isolated new target sequence, a reviewed plan digest, explicit user authorization, an undoable Premiere transaction, post-mutation reinspection, and failure-safe source in/out restoration. A prompt or token alone is not sufficient proof that an edit is safe.
+No write capability exists in connector 1.2.1. A future write connector must use a separate capability version, an isolated new target sequence, a reviewed plan digest, explicit user authorization, an undoable Premiere transaction, post-mutation reinspection, and failure-safe source in/out restoration. A prompt or token alone is not sufficient proof that an edit is safe.

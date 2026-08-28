@@ -10,8 +10,8 @@ Use live timeline evidence as the structural layer of an editorial analysis, the
 ## Workflow
 
 1. Use `premiere-bridge` to capture the active sequence. Preserve its project and sequence identity.
-2. Extract the `result.data` snapshot from the broker envelope.
-3. Run `python3 ../../scripts/premiere_sequence_analysis.py snapshot.json PREMIERE_SEQUENCE_REPORT.md`.
+2. Preserve the broker response envelope. The analysis script accepts either that envelope or an already-extracted `result.data` snapshot and validates the same snapshot contract.
+3. Run `python3 ../../scripts/premiere_sequence_analysis.py bridge-response.json PREMIERE_SEQUENCE_REPORT.md --validated-json validated-snapshot.json`.
 4. Use the report to establish sequence duration, dimensions, tracks, clip instances, source ranges, disabled items, and timeline order.
 5. For narrative judgments, join the snapshot with a word-timed transcript or selects record. For visual judgments, sample the actual export or source frames. For audio judgments, listen and measure the actual mix.
 6. Report evidence and interpretation separately. Cite timeline ranges for every conclusion and label unknowns.

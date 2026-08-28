@@ -1,10 +1,10 @@
-/* Video Chef Premiere Bridge 1.1 — original read-only UXP connector. */
+/* Video Chef Premiere Bridge 1.2 — original read-only UXP connector. */
 const ppro = require("premierepro");
 const uxp = require("uxp");
 
-const ENDPOINT = "http://127.0.0.1:17841";
+const ENDPOINT = "https://localhost:17841";
 const PROTOCOL_VERSION = "1.0";
-const CONNECTOR_VERSION = "1.1.0";
+const CONNECTOR_VERSION = "1.2.1";
 const CAPABILITIES = ["ping", "snapshot_active_sequence"];
 const TOKEN_STORAGE_KEY = "video-chef-premiere-bridge-token-v1";
 const POLL_INTERVAL_MS = 700;
@@ -72,7 +72,10 @@ function bytesToString(value) {
 async function projectItemEvidence(projectItem) {
   if (!projectItem) return {project_item_name: "", media_path: ""};
   let mediaPath = "";
-  try { mediaPath = await projectItem.getMediaFilePath(); } catch (_) { /* sequence or synthetic item */ }
+  try {
+    const clipProjectItem = ppro.ClipProjectItem.cast(projectItem);
+    mediaPath = await clipProjectItem.getMediaFilePath();
+  } catch (_) { /* sequence, synthetic item, or unavailable media */ }
   return {project_item_name: projectItem.name || "", media_path: mediaPath || ""};
 }
 
@@ -228,7 +231,11 @@ async function connect() {
   } catch (error) {
     connected = false;
     setControls();
-    setState(`Could not connect\n${error}`, "error");
+    const detail = String(error);
+    const guidance = /permission|certificate|fetch|network/i.test(detail)
+      ? "\nRun Video Chef Premiere Bridge doctor, confirm HTTPS trust, then reload this plugin."
+      : "";
+    setState(`Could not connect\n${detail}${guidance}`, "error");
   }
 }
 
